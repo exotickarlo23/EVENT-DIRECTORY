@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  /* Feštko brand paleta — semantički tokeni */
+  --color-plum: #2e1838;
+  --color-plum-soft: #43254f;
+  --color-coral: #f45f5a;
+  --color-coral-dark: #dd4742;
+  --color-ivory: #fff9f2;
+  --color-sand: #f3e9dd;
+  --color-gold: #f3c85b;
+  --color-teal: #25756f;
+  --color-ink: #241e25;
+  --color-muted: #706871;
+  --color-line: rgb(46 24 56 / 0.1);
+
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+
+  --radius-card: 1.25rem;
+
+  --shadow-card: 0 1px 2px rgb(46 24 56 / 0.05), 0 6px 20px -8px rgb(46 24 56 / 0.12);
+  --shadow-card-hover: 0 2px 4px rgb(46 24 56 / 0.06), 0 16px 32px -12px rgb(46 24 56 / 0.22);
+}
+
+body {
+  background-color: var(--color-ivory);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Fokus vidljiv na svim interaktivnim elementima */
+:focus-visible {
+  outline: 3px solid var(--color-coral);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--color-gold);
+  color: var(--color-plum);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Sadržaj članaka (markdown render) */
+.prose-festko {
+  line-height: 1.75;
+}
+.prose-festko h2 {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--color-plum);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  scroll-margin-top: 6rem;
+}
+.prose-festko h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-plum);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  scroll-margin-top: 6rem;
+}
+.prose-festko p {
+  margin-bottom: 1rem;
+}
+.prose-festko ul,
+.prose-festko ol {
+  margin: 0 0 1rem 1.25rem;
+}
+.prose-festko ul {
+  list-style: disc;
+}
+.prose-festko ol {
+  list-style: decimal;
+}
+.prose-festko li {
+  margin-bottom: 0.375rem;
+}
+.prose-festko strong {
+  color: var(--color-plum);
+}
+.prose-festko a {
+  color: var(--color-teal);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
