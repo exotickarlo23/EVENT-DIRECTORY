@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Eye, Target, TrendingUp, Palette, Search, Sparkles, HeadphonesIcon } from "lucide-react";
+import { Eye, Target, Instagram, Palette, Search, Sparkles, HeadphonesIcon } from "lucide-react";
 import { absoluteUrl } from "@/config/site";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ButtonLink, SectionHeading } from "@/components/ui";
+import { FoundingPartnersBand } from "@/components/founding-partners";
 import { Faq } from "@/components/faq";
 
 export const metadata: Metadata = {
@@ -18,6 +19,7 @@ const VALUES = [
   { icon: Search, title: "SEO prisutnost", text: "Feštko stranice optimizirane su za pretrage poput „napuhanci Zagreb” — tvoja ponuda dio je tih rezultata." },
   { icon: Palette, title: "Kvalitetan profil", text: "Fotografije, cijene, paketi i područje rada — predstavljeni pregledno i profesionalno." },
   { icon: Sparkles, title: "Istaknuta promocija", text: "Uz istaknuti profil dobivaš prioritetnu poziciju, veću galeriju i pojavljivanje na naslovnici." },
+  { icon: Instagram, title: "Objava na Instagramu", text: "Istaknuti profili dobivaju objavu (post) i story na našem Instagramu — dodatna publika bez tvog truda." },
   { icon: HeadphonesIcon, title: "Podrška oko sadržaja", text: "Pomažemo ti posložiti opis, ponudu i prezentaciju da profil ostavi najbolji dojam." },
 ];
 
@@ -78,27 +80,42 @@ export default function PostaniPartnerPage() {
         </ol>
       </section>
 
-      <section className="mt-16 rounded-card border-2 border-gold bg-gold/10 p-8 text-center md:p-10">
-        <TrendingUp className="mx-auto h-8 w-8 text-plum" aria-hidden="true" />
-        <h2 className="mt-3 font-display text-2xl font-bold text-plum md:text-3xl">
-          Posebni uvjeti za prve partnere
-        </h2>
-        <p className="mx-auto mt-2 max-w-xl text-muted">
-          Platforma je u ranoj fazi i prvim partnerima nudimo posebne uvjete za istaknute profile.
-          Javi se i dogovorit ćemo detalje.
-        </p>
-        <div className="mt-6">
-          <ButtonLink href="/kontakt" variant="secondary" size="lg">
-            Kontaktiraj nas
-          </ButtonLink>
-        </div>
-      </section>
+      <FoundingPartnersBand />
 
       <Faq
         items={[
-          { q: "Koliko košta osnovni profil?", a: "Osnovni profil je besplatan — uključuje naziv, opis, fotografiju, kategoriju, lokaciju i kontakt." },
-          { q: "Što dobivam s istaknutim profilom?", a: "Prioritetnu poziciju u rezultatima, značku „Istaknuto”, veću galeriju, pakete s cijenama, izravne CTA gumbe i mjesečnu statistiku." },
-          { q: "Mogu li preuzeti postojeći profil svog poslovanja?", a: "Da — na profilu klikni „Preuzmi ovaj profil” i pošalji zahtjev. Nakon provjere povezujemo profil s tobom." },
+          {
+            q: "Koliko košta osnovni profil?",
+            a: "Osnovni profil je potpuno besplatan i uključuje naziv, opis, jednu fotografiju, kategoriju, lokaciju i osnovne kontakte te pojavljivanje u rezultatima pretrage. Nema skrivenih troškova ni provizije na upite.",
+          },
+          {
+            q: "Što dobivam s istaknutim profilom?",
+            a: "Istaknuti profil (60 € godišnje, oko 5 € mjesečno) donosi prioritetnu poziciju u rezultatima, značku „Istaknuto”, veću galeriju s videom, pakete s detaljnim cijenama, izravne CTA gumbe (telefon, WhatsApp, e-mail), pojavljivanje na naslovnici te objavu (post) i story na našem Instagramu.",
+          },
+          {
+            q: "Što točno znači reel za founding partnere?",
+            a: "Prvim partnerima naš tim snimi i montira kratki reel o njihovom poslovanju te ga objavi na Feštko društvenim mrežama. To je dodatna promocija bez troška i truda s tvoje strane — dogovaramo termin snimanja i sadržaj zajedno.",
+          },
+          {
+            q: "Kako i kada primam upite?",
+            a: "Upite šalju korisnici izravno preko tvog profila — obrascem, telefonom ili WhatsAppom. Stižu ti na e-mail i/ili telefon koje si naveo, s opisom događaja (datum, lokacija, vrsta proslave). Feštko ne uzima proviziju na dogovorene poslove.",
+          },
+          {
+            q: "Trebam li tehničko znanje za postavljanje profila?",
+            a: "Ne. Pošalješ nam osnovne podatke i materijale, a mi složimo ili ažuriramo profil i javimo se prije objave. Uređivanje profila samostalno kroz vlastiti dashboard dolazi u sljedećoj fazi platforme.",
+          },
+          {
+            q: "Mogu li preuzeti postojeći profil svog poslovanja?",
+            a: "Da — ako tvoje poslovanje već postoji u katalogu, na profilu klikni „Preuzmi ovaj profil” i pošalji zahtjev. Nakon ručne provjere povezujemo profil s tobom i ažuriramo podatke.",
+          },
+          {
+            q: "Postoji li ugovorna obveza ili automatska naplata?",
+            a: "Ne. Istaknuti status vrijedi za dogovoreno razdoblje i produžuje se isključivo dogovorom. U ovoj fazi naplata se dogovara izravno (ponuda i račun); online plaćanje i pretplate dolaze kasnije.",
+          },
+          {
+            q: "Mogu li kasnije nadograditi ili ugasiti istaknuti profil?",
+            a: "Možeš u bilo kojem trenutku prijeći s besplatnog na istaknuti profil (i obrnuto) — postojeći profil se samo nadograđuje ili vraća na osnovni, bez gubitka podataka.",
+          },
         ]}
       />
     </div>

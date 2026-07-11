@@ -12,16 +12,16 @@ import { siteConfig, absoluteUrl } from "@/config/site";
 import {
   getCategoriesWithCounts,
   getFeaturedListings,
-  getOccasions,
   getLocationsWithCounts,
   getPublishedPosts,
 } from "@/lib/queries";
 import { HeroSearch } from "@/components/hero-search";
 import { ListingGrid } from "@/components/listing-card";
+import { GuideCard } from "@/components/guide-card";
 import { CategoryIcon } from "@/components/category-icon";
 import { SectionHeading, ButtonLink } from "@/components/ui";
 import { JsonLd } from "@/components/json-ld";
-import { pluralOglas, formatDate } from "@/lib/utils";
+import { pluralOglas } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: `${siteConfig.name} — ${siteConfig.tagline}`,
@@ -29,21 +29,11 @@ export const metadata: Metadata = {
   alternates: { canonical: absoluteUrl("/") },
 };
 
-const OCCASION_HIGHLIGHTS = [
-  { slug: "djecji-rodendan", name: "Dječji rođendan", emoji: "🎈" },
-  { slug: "vjencanje", name: "Vjenčanje", emoji: "💍" },
-  { slug: "krstenje", name: "Krštenje i pričest", emoji: "🕊️" },
-  { slug: "poslovni-event", name: "Poslovni event", emoji: "💼" },
-  { slug: "rodendan-za-odrasle", name: "Rođendan za odrasle", emoji: "🥂" },
-  { slug: "privatna-zabava", name: "Privatna zabava", emoji: "🎉" },
-];
-
 export default function HomePage() {
   const categories = getCategoriesWithCounts();
   const featured = getFeaturedListings(8);
-  const occasions = getOccasions();
   const locations = getLocationsWithCounts().filter((l) => l.listingCount > 0);
-  const posts = getPublishedPosts(4);
+  const posts = getPublishedPosts(3);
   const categoryIcons = new Map(categories.map((c) => [c.slug, c.icon]));
 
   return (
@@ -92,10 +82,7 @@ export default function HomePage() {
             </p>
           </div>
           <div className="mt-8 max-w-4xl">
-            <HeroSearch
-              locations={locations.map((l) => ({ slug: l.slug, name: l.name }))}
-              occasions={occasions.map((o) => ({ slug: o.slug, name: o.name }))}
-            />
+            <HeroSearch locations={locations.map((l) => ({ slug: l.slug, name: l.name }))} />
           </div>
         </div>
       </section>
@@ -154,25 +141,6 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {/* Prigode */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
-        <SectionHeading title="Što slavimo?" />
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-          {OCCASION_HIGHLIGHTS.map((occ) => (
-            <Link
-              key={occ.slug}
-              href={`/prigode/${occ.slug}`}
-              className="group rounded-card border border-line bg-white p-5 text-center shadow-card transition-all hover:-translate-y-1 hover:shadow-card-hover"
-            >
-              <span className="text-3xl" aria-hidden="true">
-                {occ.emoji}
-              </span>
-              <h3 className="mt-2 text-sm font-bold text-plum group-hover:text-coral">{occ.name}</h3>
-            </Link>
-          ))}
-        </div>
-      </section>
-
       {/* Kako funkcionira */}
       <section className="bg-teal/[0.06] py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -226,28 +194,9 @@ export default function HomePage() {
               title="Lakše organiziraj svoj događaj"
               subtitle="Praktični vodiči, ideje i stvarne informacije o cijenama, rezervacijama i organizaciji."
             />
-            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-              {posts.map((post) => (
-                <article
-                  key={post.slug}
-                  className="group relative flex flex-col rounded-card border border-line bg-white p-5 shadow-card transition-all hover:-translate-y-1 hover:shadow-card-hover"
-                >
-                  {post.categoryName ? (
-                    <p className="text-xs font-bold uppercase tracking-wide text-teal">
-                      {post.categoryName}
-                    </p>
-                  ) : null}
-                  <h3 className="mt-2 font-display text-lg font-semibold leading-snug text-plum">
-                    <Link
-                      href={`/vodici/${post.slug}`}
-                      className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
-                    >
-                      {post.title}
-                    </Link>
-                  </h3>
-                  <p className="mt-2 line-clamp-3 text-sm text-muted">{post.excerpt}</p>
-                  <p className="mt-auto pt-4 text-xs text-muted">{formatDate(post.publishedAt)}</p>
-                </article>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {posts.slice(0, 3).map((post) => (
+                <GuideCard key={post.slug} post={post} />
               ))}
             </div>
           </div>

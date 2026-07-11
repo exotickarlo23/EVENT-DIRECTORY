@@ -17,11 +17,9 @@ const POPULAR_SEARCHES: { label: string; href: string }[] = [
 
 export function HeroSearch({
   locations,
-  occasions,
   compact = false,
 }: {
   locations: NavTaxonomyItem[];
-  occasions: NavTaxonomyItem[];
   compact?: boolean;
 }) {
   const router = useRouter();
@@ -31,11 +29,9 @@ export function HeroSearch({
     const form = new FormData(e.currentTarget);
     const q = String(form.get("q") ?? "").trim();
     const lokacija = String(form.get("lokacija") ?? "");
-    const prigoda = String(form.get("prigoda") ?? "");
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (lokacija) params.set("lokacija", lokacija);
-    if (prigoda) params.set("prigoda", prigoda);
     void trackEvent("search_submitted", undefined, params.toString());
     router.push(`/pretraga?${params.toString()}`);
   }
@@ -48,7 +44,7 @@ export function HeroSearch({
         aria-label="Pretraga event-usluga"
         className="rounded-card border border-line bg-white p-4 shadow-card-hover md:p-5"
       >
-        <div className="grid gap-3 md:grid-cols-[1.4fr_1fr_1fr_auto] md:items-end">
+        <div className="grid gap-3 md:grid-cols-[1.6fr_1fr_auto] md:items-end">
           <div>
             <Label htmlFor="hero-q">Što tražiš?</Label>
             <Input
@@ -66,17 +62,6 @@ export function HeroSearch({
               {locations.map((l) => (
                 <option key={l.slug} value={l.slug}>
                   {l.name}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="hero-prigoda">Za koju prigodu?</Label>
-            <Select id="hero-prigoda" name="prigoda" defaultValue="">
-              <option value="">Odaberi prigodu</option>
-              {occasions.map((o) => (
-                <option key={o.slug} value={o.slug}>
-                  {o.name}
                 </option>
               ))}
             </Select>

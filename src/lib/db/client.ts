@@ -199,6 +199,7 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   title TEXT NOT NULL,
   excerpt TEXT NOT NULL DEFAULT '',
   content TEXT NOT NULL DEFAULT '',
+  cover_image TEXT,
   category_id INTEGER,
   author TEXT NOT NULL DEFAULT 'Feštko tim',
   seo_title TEXT, seo_description TEXT,
@@ -236,6 +237,21 @@ CREATE TABLE IF NOT EXISTS pricing_plans (
 );
 `;
 
+/**
+ * Idempotentne migracije za postojeće baze (SQLite nema ADD COLUMN IF NOT EXISTS).
+ * Dodavanje stupca koji već postoji baci grešku koju ovdje ignoriramo.
+ */
+function runMigrations(sqlite: Database.Database): void {
+  const addColumn = (table: string, colDef: string) => {
+    try {
+      sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${colDef}`);
+    } catch {
+      // stupac već postoji — u redu
+    }
+  };
+  addColumn("blog_posts", "cover_image TEXT");
+}
+
 function createRawDb() {
   const resolved = path.resolve(process.cwd(), DB_PATH);
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
@@ -243,6 +259,7 @@ function createRawDb() {
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("foreign_keys = ON");
   sqlite.exec(BOOTSTRAP_SQL);
+  runMigrations(sqlite);
   return drizzle(sqlite, { schema });
 }
 

@@ -43,11 +43,7 @@ export default function UslugePage() {
       </p>
 
       <div className="mt-8 max-w-4xl rounded-card bg-plum p-1">
-        <HeroSearch
-          locations={locations.map((l) => ({ slug: l.slug, name: l.name }))}
-          occasions={occasions.map((o) => ({ slug: o.slug, name: o.name }))}
-          compact
-        />
+        <HeroSearch locations={locations.map((l) => ({ slug: l.slug, name: l.name }))} compact />
       </div>
 
       <section className="mt-12">

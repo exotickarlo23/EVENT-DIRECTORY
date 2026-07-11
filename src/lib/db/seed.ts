@@ -885,8 +885,8 @@ Ako je proslava duža od 3 sata ili ima više od 12-ero djece, kombinacija napuh
       {
         slug: "istaknuti",
         name: "Istaknuti profil",
-        price: null, // cijena se definira u adminu / dogovoru — ne izmišljamo iznos
-        period: "mjesečno",
+        price: 60,
+        period: "godišnje",
         description: "Nadogradnja za ponuđače koji žele maksimalnu vidljivost.",
         featuresJson: JSON.stringify([
           "Prioritetna pozicija u rezultatima",
@@ -895,6 +895,7 @@ Ako je proslava duža od 3 sata ili ima više od 12-ero djece, kombinacija napuh
           "Paketi i detaljne cijene",
           "Izravni CTA gumbi (telefon, WhatsApp, e-mail)",
           "Pojavljivanje na naslovnici",
+          "Objava (post) i story na našem Instagramu",
           "Mjesečna statistika pregleda i kontakata",
         ]),
         ctaLabel: "Zatraži istaknuti profil",

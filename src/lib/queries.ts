@@ -237,19 +237,36 @@ export interface CategoryWithCount extends Category {
 
 export function getCategoriesWithCounts(): CategoryWithCount[] {
   const all = db.select().from(categories).orderBy(asc(categories.sortOrder), asc(categories.name)).all();
-  const counts = db.all<{ category_id: number; cnt: number }>(sql`
+
+  // Broj DISTINCT objavljenih oglasa po pojedinoj (pod)kategoriji.
+  const perCategory = db.all<{ category_id: number; cnt: number }>(sql`
     SELECT lc.category_id, COUNT(DISTINCT lc.listing_id) AS cnt
     FROM listing_categories lc
     JOIN listings l ON l.id = lc.listing_id AND l.status = 'published'
     GROUP BY lc.category_id
   `);
-  const countMap = new Map(counts.map((c) => [c.category_id, c.cnt]));
+  const perCategoryMap = new Map(perCategory.map((c) => [c.category_id, c.cnt]));
+
+  // Za top-level kategoriju broj oglasa je DISTINCT skup oglasa u njoj ILI bilo
+  // kojoj njezinoj podkategoriji (isti oglas se ne broji dvaput). Poklapa se s
+  // brojem na stranici kategorije (/usluge/[slug]).
+  const perTopLevel = db.all<{ top_id: number; cnt: number }>(sql`
+    SELECT top.id AS top_id, COUNT(DISTINCT lc.listing_id) AS cnt
+    FROM categories top
+    JOIN categories c ON c.id = top.id OR c.parent_id = top.id
+    JOIN listing_categories lc ON lc.category_id = c.id
+    JOIN listings l ON l.id = lc.listing_id AND l.status = 'published'
+    WHERE top.parent_id IS NULL
+    GROUP BY top.id
+  `);
+  const topLevelMap = new Map(perTopLevel.map((c) => [c.top_id, c.cnt]));
+
   const topLevel = all.filter((c) => c.parentId == null);
   return topLevel.map((c) => {
-    const children = all.filter((ch) => ch.parentId === c.id);
-    const ownCount = countMap.get(c.id) ?? 0;
-    const childCount = children.reduce((s, ch) => s + (countMap.get(ch.id) ?? 0), 0);
-    return { ...c, children, listingCount: ownCount + childCount };
+    const children = all
+      .filter((ch) => ch.parentId === c.id)
+      .map((ch) => ({ ...ch, listingCount: perCategoryMap.get(ch.id) ?? 0 }));
+    return { ...c, children, listingCount: topLevelMap.get(c.id) ?? 0 };
   });
 }
 
@@ -464,6 +481,7 @@ function mapPost(r: Record<string, unknown>): BlogPost {
     title: r.title,
     excerpt: r.excerpt,
     content: r.content,
+    coverImage: r.cover_image,
     categoryId: r.category_id,
     author: r.author,
     seoTitle: r.seo_title,
