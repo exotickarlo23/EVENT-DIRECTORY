@@ -2,9 +2,29 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { sql } from "drizzle-orm";
 import * as schema from "./schema";
+import { seedDatabase } from "./seed";
 
-const DB_PATH = process.env.DATABASE_PATH ?? "./data/festko.db";
+// Na serverless okruženju (Vercel) filesystem je read-only osim /tmp,
+// pa tamo bazu držimo u /tmp i seedamo je demo podacima pri prvom pokretanju.
+// Rezultat je preview-grade deploy (podaci nisu trajni ni dijeljeni između
+// instanci); za produkciju s trajnim podacima migrirati na Postgres.
+const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+
+function resolveDbPath(): string {
+  const configured = process.env.DATABASE_PATH;
+  if (IS_SERVERLESS) {
+    // Poštuj DATABASE_PATH samo ako je već u zapisivom /tmp-u.
+    return configured && configured.startsWith("/tmp") ? configured : "/tmp/festko.db";
+  }
+  return configured ?? "./data/festko.db";
+}
+
+const DB_PATH = resolveDbPath();
+
+/** Treba li automatski seedati praznu bazu (serverless preview ili eksplicitni flag). */
+const SHOULD_AUTOSEED = IS_SERVERLESS || process.env.FESTKO_AUTOSEED === "1";
 
 /**
  * Bootstrap shema — izvršava se idempotentno pri otvaranju baze, tako da
@@ -216,7 +236,7 @@ CREATE TABLE IF NOT EXISTS pricing_plans (
 );
 `;
 
-function createDb() {
+function createRawDb() {
   const resolved = path.resolve(process.cwd(), DB_PATH);
   fs.mkdirSync(path.dirname(resolved), { recursive: true });
   const sqlite = new Database(resolved);
@@ -226,7 +246,22 @@ function createDb() {
   return drizzle(sqlite, { schema });
 }
 
-type Db = ReturnType<typeof createDb>;
+export type Db = ReturnType<typeof createRawDb>;
+
+function createDb(): Db {
+  const instance = createRawDb();
+  if (SHOULD_AUTOSEED) {
+    try {
+      const row = instance.get<{ c: number }>(sql`SELECT COUNT(*) c FROM categories`);
+      if (!row || row.c === 0) {
+        seedDatabase(instance);
+      }
+    } catch (err) {
+      console.error("[db] auto-seed nije uspio:", err);
+    }
+  }
+  return instance;
+}
 
 // Jedna konekcija po procesu (Next.js hot-reload safe)
 const globalForDb = globalThis as unknown as { __festkoDb?: Db };

@@ -24,6 +24,8 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 60_000,
     env: {
+      // Auto-seed praznu bazu da e2e radi i na čistom checkoutu.
+      FESTKO_AUTOSEED: "1",
       // Test-only admin pristup za e2e (lozinka: festko-e2e-test).
       // NIJE za produkciju — produkcija koristi vlastite env varijable.
       AUTH_SECRET: "e2e-test-secret-not-for-production-use-0000",
