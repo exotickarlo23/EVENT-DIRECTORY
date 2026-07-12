@@ -5,7 +5,7 @@ import { ListingFilters, type FilterConfig } from "@/components/listing-filters"
 import { EmptyState, ButtonLink } from "@/components/ui";
 import { JsonLd } from "@/components/json-ld";
 import { absoluteUrl } from "@/config/site";
-import { pluralOglas, cn } from "@/lib/utils";
+import { pluralOglas, cn, listingPath } from "@/lib/utils";
 import type { NavTaxonomyItem } from "@/components/header";
 
 const PAGE_SIZE = 12;
@@ -82,7 +82,7 @@ export function ListingBrowse({
               itemListElement: items.map((l, i) => ({
                 "@type": "ListItem",
                 position: (page - 1) * PAGE_SIZE + i + 1,
-                url: absoluteUrl(`/ponudaci/${l.slug}`),
+                url: absoluteUrl(listingPath(l)),
                 name: l.name,
               })),
             }}

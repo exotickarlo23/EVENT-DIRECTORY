@@ -538,8 +538,24 @@ export function getIndexableCategoryLocationPairs(): {
   `);
 }
 
-export function getAllPublishedListingSlugs(): { slug: string; updatedAt: string }[] {
-  return db.all<{ slug: string; updatedAt: string }>(
-    sql`SELECT slug, updated_at AS updatedAt FROM listings WHERE status = 'published'`
-  );
+export function getAllPublishedListingSlugs(): {
+  slug: string;
+  updatedAt: string;
+  categorySlug: string | null;
+  locationSlug: string | null;
+}[] {
+  return db.all<{
+    slug: string;
+    updatedAt: string;
+    categorySlug: string | null;
+    locationSlug: string | null;
+  }>(sql`
+    SELECT l.slug, l.updated_at AS updatedAt,
+      c.slug AS categorySlug,
+      loc.slug AS locationSlug
+    FROM listings l
+    LEFT JOIN categories c ON c.id = l.primary_category_id
+    LEFT JOIN locations loc ON loc.id = l.base_location_id
+    WHERE l.status = 'published'
+  `);
 }

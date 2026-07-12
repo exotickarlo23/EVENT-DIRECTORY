@@ -53,6 +53,21 @@ export function slugify(input: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/**
+ * Kanonski URL pojedinačnog oglasa: /usluge/[kategorija]/[lokacija]/[ime].
+ * Kategorija i lokacija se izvode iz podataka oglasa; kad nedostaju, koriste se
+ * stabilni fallback segmenti (oglas se i dalje jednoznačno identificira slugom).
+ */
+export function listingPath(input: {
+  slug: string;
+  categorySlug?: string | null;
+  locationSlug?: string | null;
+}): string {
+  const category = input.categorySlug || "ostalo";
+  const location = input.locationSlug || "hrvatska";
+  return `/usluge/${category}/${location}/${input.slug}`;
+}
+
 export function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   return `${text.slice(0, max - 1).trimEnd()}…`;

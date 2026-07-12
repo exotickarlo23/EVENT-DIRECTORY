@@ -97,7 +97,13 @@ prikazuje read-only; CRUD sučelje je u backlogu faze 2.
 
 - URL struktura: `/usluge/[kategorija]`, `/usluge/[kategorija]/[lokacija]` (glavni
   SEO motor), `/prigode/[prigoda]`, `/prigode/[prigoda]/[lokacija]`,
-  `/lokacije/[grad]`, `/ponudaci/[slug]`, `/vodici/[slug]`
+  `/lokacije/[grad]`, `/vodici/[slug]`
+- **Kanonski URL oglasa** je hijerarhijski: `/usluge/[kategorija]/[lokacija]/[ime]`,
+  automatski izveden iz oglasa (primarna kategorija + sjedište + slug imena).
+  Slug ostaje jedinstveni ključ pa se svaka druga kombinacija kategorije/lokacije
+  (i naslijeđeni `/ponudaci/[slug]`) trajno (301) preusmjerava na kanonski put —
+  linkovi se ne lome kad se promijeni kategorija ili lokacija (samo promjena
+  imena/sluga zahtijeva ručni redirect, backlog faze 2).
 - Jedinstveni title/description/canonical po stranici (Metadata API)
 - **Zaštita od SEO spama**: category×location stranice bez oglasa su `noindex`;
   filtrirane/paginirane varijante su `noindex` s canonicalom na čistu rutu; sitemap

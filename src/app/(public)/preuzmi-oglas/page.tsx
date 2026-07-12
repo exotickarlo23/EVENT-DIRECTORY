@@ -4,6 +4,8 @@ import { absoluteUrl } from "@/config/site";
 import { getListingBySlug } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { EmptyState, ButtonLink } from "@/components/ui";
+import { listingCanonicalSlugs } from "@/components/listing-detail";
+import { listingPath } from "@/lib/utils";
 import { ClaimForm } from "./claim-form";
 
 export const metadata: Metadata = {
@@ -52,7 +54,10 @@ export default async function PreuzmiOglasPage({ searchParams }: Props) {
         <>
           <p className="mt-3 text-muted">
             Šalješ zahtjev za preuzimanje profila{" "}
-            <Link href={`/ponudaci/${listing.slug}`} className="font-bold text-teal underline">
+            <Link
+              href={listingPath({ slug: listing.slug, ...listingCanonicalSlugs(listing) })}
+              className="font-bold text-teal underline"
+            >
               {listing.name}
             </Link>
             {listing.baseLocation ? ` (${listing.baseLocation.name})` : ""}. Nakon ručne provjere

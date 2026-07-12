@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { MapPin, Star, ArrowRight, Sparkles } from "lucide-react";
 import type { ListingCard as ListingCardData } from "@/lib/queries";
-import { formatPrice, cn } from "@/lib/utils";
+import { formatPrice, cn, listingPath } from "@/lib/utils";
 import { Badge } from "@/components/ui";
 import { ListingImage } from "@/components/listing-image";
 import { FavoriteButton } from "@/components/favorite-button";
@@ -51,7 +51,7 @@ export function ListingCard({
         <h3 className="mt-1 font-display text-lg font-semibold leading-snug text-plum">
           {/* Cijela kartica klikabilna preko ::after, uz ispravan fokus na linku */}
           <Link
-            href={`/ponudaci/${listing.slug}`}
+            href={listingPath(listing)}
             className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
           >
             {listing.name}

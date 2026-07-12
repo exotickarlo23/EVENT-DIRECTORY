@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/config/site";
+import { listingPath } from "@/lib/utils";
 import {
   getCategoriesWithCounts,
   getOccasions,
@@ -61,7 +62,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     .map((l) => ({ url: absoluteUrl(`/lokacije/${l.slug}`), lastModified: now, priority: 0.6 }));
 
   const listings = getAllPublishedListingSlugs().map((l) => ({
-    url: absoluteUrl(`/ponudaci/${l.slug}`),
+    url: absoluteUrl(listingPath(l)),
     lastModified: new Date(l.updatedAt),
     priority: 0.7,
   }));

@@ -7,7 +7,7 @@ import { useFavorites } from "@/components/favorites-provider";
 import { getListingCards } from "@/lib/actions/public";
 import type { ListingCard as ListingCardData } from "@/lib/queries";
 import { EmptyState, ButtonLink, Skeleton, Badge } from "@/components/ui";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, listingPath } from "@/lib/utils";
 
 export function CompareTable() {
   const { compare, toggleCompare, clearCompare, ready } = useFavorites();
@@ -69,7 +69,7 @@ export function CompareTable() {
                 <th scope="col" key={item.id} className="min-w-44 p-4 text-left align-top">
                   <div className="flex items-start justify-between gap-2">
                     <Link
-                      href={`/ponudaci/${item.slug}`}
+                      href={listingPath(item)}
                       className="font-display text-base font-semibold text-plum hover:text-coral"
                     >
                       {item.name}
@@ -113,7 +113,7 @@ export function CompareTable() {
               </th>
               {items.map((item) => (
                 <td key={item.id} className="p-4">
-                  <ButtonLink href={`/ponudaci/${item.slug}`} size="sm">
+                  <ButtonLink href={listingPath(item)} size="sm">
                     Pogledaj ponudu
                   </ButtonLink>
                 </td>

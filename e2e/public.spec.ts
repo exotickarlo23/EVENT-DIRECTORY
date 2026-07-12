@@ -10,7 +10,8 @@ test("korisnik odabire kategoriju i grad te otvara oglas", async ({ page }) => {
   await page.goto("/usluge/napuhanci-i-atrakcije/zagreb");
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Napuhanci i atrakcije — Zagreb");
   await page.getByRole("link", { name: "Skočko napuhanci" }).click();
-  await expect(page).toHaveURL(/\/ponudaci\/skocko-napuhanci/);
+  // Kanonski URL: /usluge/[kategorija]/[lokacija]/[ime]
+  await expect(page).toHaveURL(/\/usluge\/napuhanci-i-atrakcije\/zagreb\/skocko-napuhanci/);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Skočko napuhanci");
 });
 
