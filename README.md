@@ -10,23 +10,30 @@ upravljanje sadržajem.
 - **Next.js 16** (App Router, server components, server actions)
 - **TypeScript** (strict + noUncheckedIndexedAccess)
 - **Tailwind CSS 4** (semantički design tokeni u `globals.css` — `@theme`)
-- **Drizzle ORM + better-sqlite3** (lokalna SQLite baza, bez vanjskih servisa)
+- **Drizzle ORM + postgres-js** (Postgres; produkcija na Supabaseu, async data-sloj)
 - **Zod** (server-side validacija svih formi)
 - **Lucide** ikone, **Fraunces + Manrope** preko `next/font`
 - **Playwright** e2e testovi
 
-> **Zašto SQLite, a ne Supabase?** MVP radi bez ijednog vanjskog credentiala —
-> kloniraj, seedaj, pokreni. Model podataka (`src/lib/db/schema.ts`) pisan je
-> portabilno; migracija na Postgres/Supabase svodi se na zamjenu drivera u
-> `src/lib/db/client.ts` i prepis bootstrap SQL-a. Vidi „Faza 2".
+> **Baza: Postgres (Supabase).** Cijeli data-sloj (`src/lib/queries.ts`,
+> `src/lib/admin-queries.ts`, akcije) je asinkron i piše čisti Postgres.
+> Shema je u `scripts/schema.sql` (idempotentan DDL), a povezivanje ide preko
+> jedne env varijable `DATABASE_URL`. Za produkciju koristi Supabase
+> **Transaction pooler** connection string (port `6543`).
 
 ## Lokalno pokretanje
 
+Trebaš Postgres bazu (Supabase projekt ili lokalni Postgres). Postavi
+`DATABASE_URL` u `.env`, zatim:
+
 ```bash
 npm install
-npm run db:seed      # kreira data/festko.db i puni demo podacima
+npm run db:seed      # primijeni scripts/schema.sql + napuni demo podacima
 npm run dev          # http://localhost:3000
 ```
+
+`db:seed` je idempotentan: primijeni shemu (`CREATE TABLE IF NOT EXISTS`),
+očisti tablice (`TRUNCATE … RESTART IDENTITY`) i ponovno napuni demo podatke.
 
 Production build:
 
@@ -46,11 +53,11 @@ Kopiraj `.env.example` u `.env` i popuni. Ključno:
 
 | Varijabla | Obavezno | Opis |
 |---|---|---|
+| `DATABASE_URL` | **da** | Postgres connection string. Supabase: Project Settings → Database → **Transaction pooler** (port `6543`), s lozinkom baze |
 | `NEXT_PUBLIC_SITE_URL` | produkcija | Javni URL (canonical, sitemap, OG) |
 | `AUTH_SECRET` | produkcija | Min. 32 znaka, potpisivanje admin sessiona |
 | `ADMIN_EMAIL` | produkcija | E-mail administratora |
 | `ADMIN_PASSWORD_HASH` | produkcija | `scrypt:<salt>:<hash>` — naredba za generiranje je u `.env.example` |
-| `DATABASE_PATH` | ne | Putanja SQLite datoteke (default `./data/festko.db`) |
 | `EMAIL_PROVIDER` | ne | `console` (default, samo logira) ili `resend` |
 | `RESEND_API_KEY`, `EMAIL_FROM`, `ADMIN_NOTIFY_EMAIL` | ne | E-mail obavijesti o upitima/zahtjevima |
 
@@ -131,7 +138,7 @@ blokiranja stranice.
 
 ## Demo podaci
 
-Seed puni **izmišljena demo poslovanja** (`is_demo = 1`, jasno označena bedžem „Demo"
+Seed puni **izmišljena demo poslovanja** (`is_demo = true`, jasno označena bedžem „Demo"
 na stranici oglasa): 18 kategorija + podkategorije (37 ukupno), 12 lokacija, 16
 prigoda, 23 oglasa (6 istaknutih, nekoliko nepreuzetih profila, različiti modeli
 cijena, paketi), 3 vodiča s FAQ-om, 2 pricing plana. Oglasi bez fotografija koriste
@@ -169,5 +176,5 @@ seed, e2e testovi.
   namjerno isključen dok nema moderacije)
 - Statistika za ponuđače, više članova tima, kalendar dostupnosti, odgovaranje na
   leadove iz sučelja
-- Migracija na Postgres/Supabase (upute gore), Redis rate-limiting kod skaliranja
+- Redis rate-limiting kod skaliranja (sada in-memory po instanci)
 - Verifikacijske značke; native aplikacija samo ako se pokaže potreba
