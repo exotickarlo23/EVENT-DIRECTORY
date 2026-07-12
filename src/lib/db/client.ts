@@ -10,7 +10,9 @@ import { seedDatabase } from "./seed";
 // pa tamo bazu držimo u /tmp i seedamo je demo podacima pri prvom pokretanju.
 // Rezultat je preview-grade deploy (podaci nisu trajni ni dijeljeni između
 // instanci); za produkciju s trajnim podacima migrirati na Postgres.
-const IS_SERVERLESS = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME);
+const IS_SERVERLESS = Boolean(
+  process.env.VERCEL || process.env.NETLIFY || process.env.AWS_LAMBDA_FUNCTION_NAME
+);
 
 function resolveDbPath(): string {
   const configured = process.env.DATABASE_PATH;
@@ -201,7 +203,7 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   content TEXT NOT NULL DEFAULT '',
   cover_image TEXT,
   category_id INTEGER,
-  author TEXT NOT NULL DEFAULT 'Feštko tim',
+  author TEXT NOT NULL DEFAULT 'slavimo.hr tim',
   seo_title TEXT, seo_description TEXT,
   faq TEXT, related_category_slugs TEXT,
   status TEXT NOT NULL DEFAULT 'draft',

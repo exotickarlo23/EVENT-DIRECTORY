@@ -852,7 +852,7 @@ Ako je proslava duža od 3 sata ili ima više od 12-ero djece, kombinacija napuh
         excerpt: post.excerpt,
         content: post.content,
         categoryId: blogCatIds.get(post.category) ?? null,
-        seoTitle: `${post.title} | Feštko vodiči`,
+        seoTitle: `${post.title} | slavimo.hr vodiči`,
         seoDescription: post.excerpt,
         faq: JSON.stringify(post.faq),
         relatedCategorySlugs: JSON.stringify(post.related),

@@ -1,5 +1,6 @@
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { RevealOnScroll } from "@/components/reveal-on-scroll";
 import {
   getCategoriesWithCounts,
   getOccasions,
@@ -17,6 +18,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
   return (
     <>
+      <RevealOnScroll />
       <Header categories={categories} occasions={occasions} />
       <main id="glavni-sadrzaj" className="min-h-[60vh]">
         {children}

@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 const VALUES = [
   { icon: Eye, title: "Vidljivost gdje se traži", text: "Tvoj profil pojavljuje se u tvojoj kategoriji i lokaciji — točno tamo gdje korisnici traže uslugu poput tvoje." },
   { icon: Target, title: "Ciljani upiti", text: "Upite šalju ljudi koji već planiraju događaj — s datumom, lokacijom i vrstom proslave." },
-  { icon: Search, title: "SEO prisutnost", text: "Feštko stranice optimizirane su za pretrage poput „napuhanci Zagreb” — tvoja ponuda dio je tih rezultata." },
+  { icon: Search, title: "SEO prisutnost", text: "slavimo.hr stranice optimizirane su za pretrage poput „napuhanci Zagreb” — tvoja ponuda dio je tih rezultata." },
   { icon: Palette, title: "Kvalitetan profil", text: "Fotografije, cijene, paketi i područje rada — predstavljeni pregledno i profesionalno." },
   { icon: Sparkles, title: "Istaknuta promocija", text: "Uz istaknuti profil dobivaš prioritetnu poziciju, veću galeriju i pojavljivanje na naslovnici." },
   { icon: Instagram, title: "Objava na Instagramu", text: "Istaknuti profili dobivaju objavu (post) i story na našem Instagramu — dodatna publika bez tvog truda." },
@@ -94,11 +94,11 @@ export default function PostaniPartnerPage() {
           },
           {
             q: "Što točno znači reel za founding partnere?",
-            a: "Prvim partnerima naš tim snimi i montira kratki reel o njihovom poslovanju te ga objavi na Feštko društvenim mrežama. To je dodatna promocija bez troška i truda s tvoje strane — dogovaramo termin snimanja i sadržaj zajedno.",
+            a: "Prvim partnerima naš tim snimi i montira kratki reel o njihovom poslovanju te ga objavi na slavimo.hr društvenim mrežama. To je dodatna promocija bez troška i truda s tvoje strane — dogovaramo termin snimanja i sadržaj zajedno.",
           },
           {
             q: "Kako i kada primam upite?",
-            a: "Upite šalju korisnici izravno preko tvog profila — obrascem, telefonom ili WhatsAppom. Stižu ti na e-mail i/ili telefon koje si naveo, s opisom događaja (datum, lokacija, vrsta proslave). Feštko ne uzima proviziju na dogovorene poslove.",
+            a: "Upite šalju korisnici izravno preko tvog profila — obrascem, telefonom ili WhatsAppom. Stižu ti na e-mail i/ili telefon koje si naveo, s opisom događaja (datum, lokacija, vrsta proslave). slavimo.hr ne uzima proviziju na dogovorene poslove.",
           },
           {
             q: "Trebam li tehničko znanje za postavljanje profila?",

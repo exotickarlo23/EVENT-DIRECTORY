@@ -1,0 +1,11 @@
+# Netlify konfiguracija — spremno za prebacivanje hostinga s Vercela.
+# Next.js runtime plugin Netlify automatski instalira; ovdje ga samo eksplicitno
+# navodimo. Baza (SQLite u /tmp) i auto-seed rade isto kao na Vercelu jer kôd
+# detektira NETLIFY env varijablu (vidi src/lib/db/client.ts).
+
+[build]
+  command = "next build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

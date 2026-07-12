@@ -68,27 +68,36 @@ export default function HomePage() {
       {/* Hero */}
       <section className="relative -mt-16 overflow-hidden bg-plum pb-16 pt-28 md:pb-24 md:pt-36">
         <HeroDecor />
+        {/* Lebdeći dekorativni oblici — suptilna živost */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+          <div className="float-slow absolute -left-8 top-24 h-40 w-40 rounded-full bg-coral/25 blur-3xl" />
+          <div className="float-slower absolute right-4 top-10 h-52 w-52 rounded-full bg-teal/20 blur-3xl" />
+          <div className="float-slow absolute bottom-6 left-1/3 h-32 w-32 rounded-full bg-gold/20 blur-3xl" />
+        </div>
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6">
           <div className="max-w-3xl">
-            <p className="mb-3 text-sm font-bold uppercase tracking-widest text-gold">
+            <p className="anim-rise mb-3 text-sm font-bold uppercase tracking-widest text-gold">
               Tvoj događaj počinje ovdje
             </p>
-            <h1 className="font-display text-4xl font-bold leading-tight text-white md:text-6xl">
+            <h1 className="anim-rise anim-delay-1 font-display text-4xl font-bold leading-tight text-white md:text-6xl">
               Sve za događaj koji se pamti.
             </h1>
-            <p className="mt-4 max-w-2xl text-lg text-white/80 md:text-xl">
+            <p className="anim-rise anim-delay-2 mt-4 max-w-2xl text-lg text-white/80 md:text-xl">
               Pronađi prostore, zabavu, catering, dekoracije, fotografe i opremu za svoju
               proslavu — na jednom mjestu.
             </p>
           </div>
-          <div className="mt-8 max-w-4xl">
-            <HeroSearch locations={locations.map((l) => ({ slug: l.slug, name: l.name }))} />
+          <div className="anim-rise anim-delay-3 mt-8 max-w-4xl">
+            <HeroSearch
+              categories={categories.map((c) => ({ slug: c.slug, name: c.name, count: c.listingCount }))}
+              locations={locations.map((l) => ({ slug: l.slug, name: l.name }))}
+            />
           </div>
         </div>
       </section>
 
       {/* Trust strip */}
-      <section aria-label="Zašto Feštko" className="border-b border-line bg-sand/60">
+      <section aria-label="Zašto slavimo.hr" className="border-b border-line bg-sand/60">
         <div className="mx-auto grid max-w-7xl gap-4 px-4 py-6 sm:px-6 md:grid-cols-4">
           <TrustItem icon={<Layers className="h-5 w-5" />} text="Sve usluge na jednom mjestu" />
           <TrustItem icon={<MapPin className="h-5 w-5" />} text="Pretraga po lokaciji" />
@@ -103,12 +112,12 @@ export default function HomePage() {
           title="Što trebaš za svoju proslavu?"
           subtitle="Od prvog plana do zadnje pjesme — pronađi prave ljude i usluge za svaki dio događaja."
         />
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <div className="reveal grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {categories.slice(0, 12).map((cat) => (
             <Link
               key={cat.slug}
               href={`/usluge/${cat.slug}`}
-              className="group rounded-card border border-line bg-white p-5 shadow-card transition-all hover:-translate-y-1 hover:border-coral/40 hover:shadow-card-hover"
+              className="group rounded-card border border-line bg-white p-5 shadow-card transition-all duration-200 hover:-translate-y-1 hover:border-coral/40 hover:shadow-card-hover"
             >
               <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-sand text-plum transition-colors group-hover:bg-coral group-hover:text-white">
                 <CategoryIcon icon={cat.icon} className="h-6 w-6" />
@@ -136,7 +145,9 @@ export default function HomePage() {
               title="Ponude koje vrijedi pogledati"
               subtitle="Istaknuti ponuđači spremni su tvoju ideju pretvoriti u pravi događaj."
             />
-            <ListingGrid listings={featured.slice(0, 6)} categoryIcons={categoryIcons} />
+            <div className="reveal">
+              <ListingGrid listings={featured.slice(0, 6)} categoryIcons={categoryIcons} />
+            </div>
           </div>
         </section>
       ) : null}
@@ -145,7 +156,7 @@ export default function HomePage() {
       <section className="bg-teal/[0.06] py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <SectionHeading title="Od ideje do upita u tri jednostavna koraka" align="center" />
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="reveal grid gap-6 md:grid-cols-3">
             <StepCard
               step={1}
               icon={<Search className="h-6 w-6" />}
@@ -194,7 +205,7 @@ export default function HomePage() {
               title="Lakše organiziraj svoj događaj"
               subtitle="Praktični vodiči, ideje i stvarne informacije o cijenama, rezervacijama i organizaciji."
             />
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="reveal grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {posts.slice(0, 3).map((post) => (
                 <GuideCard key={post.slug} post={post} />
               ))}

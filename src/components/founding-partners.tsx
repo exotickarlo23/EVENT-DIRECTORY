@@ -29,7 +29,7 @@ export function FoundingPartnersBand() {
 
         <div className="mx-auto mt-8 grid max-w-3xl gap-4 sm:grid-cols-3">
           <FoundingPerk icon={Video} title="Reel s naše strane" text="Snimamo i montiramo kratki reel o tvom poslovanju — bez tvog troška." />
-          <FoundingPerk icon={Instagram} title="Objava na mrežama" text="Reel objavljujemo na Feštko profilima i predstavljamo te našoj publici." />
+          <FoundingPerk icon={Instagram} title="Objava na mrežama" text="Reel objavljujemo na slavimo.hr profilima i predstavljamo te našoj publici." />
           <FoundingPerk icon={Sparkles} title="Povlašteni uvjeti" text="Prvi partneri dobivaju najbolje uvjete za istaknuti profil." />
         </div>
 

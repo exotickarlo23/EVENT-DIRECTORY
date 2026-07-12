@@ -35,7 +35,11 @@ export default async function PretragaPage({ searchParams }: Props) {
       </h1>
       <p className="mt-2 text-muted">{total === 1 ? "1 rezultat" : `${total} rezultata`}</p>
       <div className="mt-6 max-w-4xl rounded-card bg-plum p-1">
-        <HeroSearch locations={locations.map((l) => ({ slug: l.slug, name: l.name }))} compact />
+        <HeroSearch
+          categories={allCategories.map((c) => ({ slug: c.slug, name: c.name, count: c.listingCount }))}
+          locations={locations.map((l) => ({ slug: l.slug, name: l.name }))}
+          compact
+        />
       </div>
       <div className="mt-8">
         <ListingBrowse

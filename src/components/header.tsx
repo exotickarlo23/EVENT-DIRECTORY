@@ -85,7 +85,7 @@ export function Header({
       </a>
       <nav ref={navRef} aria-label="Glavna navigacija" className="mx-auto max-w-7xl px-4 sm:px-6">
         <div className="flex h-16 items-center justify-between gap-4">
-          <Link href="/" aria-label="Feštko — naslovnica" className="shrink-0">
+          <Link href="/" aria-label="slavimo.hr — naslovnica" className="shrink-0">
             <Logo />
           </Link>
 

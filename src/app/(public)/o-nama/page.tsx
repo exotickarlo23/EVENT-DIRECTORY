@@ -6,7 +6,7 @@ import { ButtonLink } from "@/components/ui";
 export const metadata: Metadata = {
   title: "O nama",
   description:
-    "Feštko je hrvatski katalog event-usluga: jedno mjesto za prostore, zabavu, catering, dekoracije, fotografe i opremu.",
+    "slavimo.hr je hrvatski katalog event-usluga: jedno mjesto za prostore, zabavu, catering, dekoracije, fotografe i opremu.",
   alternates: { canonical: absoluteUrl("/o-nama") },
 };
 
@@ -34,7 +34,7 @@ export default function ONamaPage() {
         </ul>
         <p>
           Platforma je u ranoj fazi i katalog se aktivno puni. Ako ti nešto nedostaje — javi nam
-          se, tvoje povratne informacije oblikuju Feštko.
+          se, tvoje povratne informacije oblikuju slavimo.hr.
         </p>
       </div>
       <div className="mt-8 flex flex-wrap gap-3">
