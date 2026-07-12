@@ -36,8 +36,8 @@ export default async function PretragaPage({ searchParams }: Props) {
       <p className="mt-2 text-muted">{total === 1 ? "1 rezultat" : `${total} rezultata`}</p>
       <div className="mt-6 max-w-4xl rounded-card bg-plum p-1">
         <HeroSearch
+          categories={allCategories.map((c) => ({ slug: c.slug, name: c.name, count: c.listingCount }))}
           locations={locations.map((l) => ({ slug: l.slug, name: l.name }))}
-          occasions={occasions.map((o) => ({ slug: o.slug, name: o.name }))}
           compact
         />
       </div>

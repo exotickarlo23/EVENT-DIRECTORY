@@ -7,7 +7,7 @@ import { BusinessForm } from "./business-form";
 export const metadata: Metadata = {
   title: "Dodaj poslovanje — besplatan profil za event-usluge",
   description:
-    "Prijavi svoje event-poslovanje na Feštko: besplatan profil, ciljani upiti i vidljivost u tvojoj kategoriji i gradu.",
+    "Prijavi svoje event-poslovanje na slavimo.hr: besplatan profil, ciljani upiti i vidljivost u tvojoj kategoriji i gradu.",
   alternates: { canonical: absoluteUrl("/dodaj-poslovanje") },
 };
 

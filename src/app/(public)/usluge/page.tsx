@@ -44,8 +44,8 @@ export default function UslugePage() {
 
       <div className="mt-8 max-w-4xl rounded-card bg-plum p-1">
         <HeroSearch
+          categories={categories.map((c) => ({ slug: c.slug, name: c.name, count: c.listingCount }))}
           locations={locations.map((l) => ({ slug: l.slug, name: l.name }))}
-          occasions={occasions.map((o) => ({ slug: o.slug, name: o.name }))}
           compact
         />
       </div>
@@ -148,8 +148,8 @@ export default function UslugePage() {
       <Faq
         items={[
           {
-            q: "Kako funkcionira Feštko?",
-            a: "Feštko je katalog event-usluga: pretražiš kategoriju i grad, usporediš ponuđače i pošalješ im izravan upit — bez posrednika i bez naknade za korisnike.",
+            q: "Kako funkcionira slavimo.hr?",
+            a: "slavimo.hr je katalog event-usluga: pretražiš kategoriju i grad, usporediš ponuđače i pošalješ im izravan upit — bez posrednika i bez naknade za korisnike.",
           },
           {
             q: "Naplaćuje li se slanje upita?",

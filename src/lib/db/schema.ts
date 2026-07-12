@@ -260,8 +260,9 @@ export const blogPosts = sqliteTable("blog_posts", {
   title: text("title").notNull(),
   excerpt: text("excerpt").notNull().default(""),
   content: text("content").notNull().default(""), // Markdown
+  coverImage: text("cover_image"),
   categoryId: integer("category_id"),
-  author: text("author").notNull().default("Feštko tim"),
+  author: text("author").notNull().default("slavimo.hr tim"),
   seoTitle: text("seo_title"),
   seoDescription: text("seo_description"),
   faq: text("faq"), // JSON [{q,a}]

@@ -1,4 +1,4 @@
-# Feštko — Sve za događaj koji se pamti.
+# slavimo.hr — Sve za događaj koji se pamti.
 
 Katalog i tražilica event-usluga u Hrvatskoj: napuhanci, animatori, photobooth, catering,
 prostori, dekoracije, glazba, fotografi i oprema — na jednom mjestu. Freemium directory

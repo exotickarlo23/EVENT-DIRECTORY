@@ -163,7 +163,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
           },
           {
             q: "Je li slanje upita besplatno?",
-            a: "Da — Feštko je besplatan za korisnike. Upit šalješ izravno ponuđaču, bez posrednika.",
+            a: "Da — slavimo.hr je besplatan za korisnike. Upit šalješ izravno ponuđaču, bez posrednika.",
           },
         ]}
       />

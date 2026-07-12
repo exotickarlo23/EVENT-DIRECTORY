@@ -6,7 +6,7 @@ import { ButtonLink, SectionHeading } from "@/components/ui";
 import { Faq } from "@/components/faq";
 
 export const metadata: Metadata = {
-  title: "Kako funkcionira Feštko",
+  title: "Kako funkcionira slavimo.hr",
   description:
     "Od ideje do upita u tri koraka: odaberi uslugu i lokaciju, usporedi ponuđače i pošalji izravan upit — besplatno.",
   alternates: { canonical: absoluteUrl("/kako-funkcionira") },
@@ -20,7 +20,7 @@ export default function KakoFunkcioniraPage() {
         Od ideje do upita u tri jednostavna koraka
       </h1>
       <p className="mt-3 text-lg text-muted">
-        Feštko je katalog event-usluga — spaja ljude koji planiraju događaj s ponuđačima koji ga
+        slavimo.hr je katalog event-usluga — spaja ljude koji planiraju događaj s ponuđačima koji ga
         znaju izvesti. Korištenje je za korisnike potpuno besplatno.
       </p>
 
@@ -72,7 +72,7 @@ export default function KakoFunkcioniraPage() {
       <Faq
         items={[
           { q: "Koliko košta korištenje Feštka?", a: "Za korisnike koji traže usluge — ništa. Pretraga, favoriti, usporedba i slanje upita su besplatni." },
-          { q: "Rezervira li Feštko termin umjesto mene?", a: "Ne — Feštko te povezuje s ponuđačem, a dogovor o terminu, cijeni i plaćanju radiš izravno s njim." },
+          { q: "Rezervira li slavimo.hr termin umjesto mene?", a: "Ne — slavimo.hr te povezuje s ponuđačem, a dogovor o terminu, cijeni i plaćanju radiš izravno s njim." },
           { q: "Kako znam je li ponuđač pouzdan?", a: "Pogledaj potpunost profila, fotografije i recenzije drugih korisnika. Preporučujemo poslati upit većem broju ponuđača i usporediti ponude." },
         ]}
       />

@@ -18,6 +18,7 @@ import {
   Flower2,
   Car,
   Star,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -40,6 +41,7 @@ const ICONS: Record<string, LucideIcon> = {
   gift: Gift,
   "flower-2": Flower2,
   car: Car,
+  book: BookOpen,
 };
 
 export function CategoryIcon({

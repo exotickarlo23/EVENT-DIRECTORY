@@ -31,7 +31,7 @@ export function Footer({
                   href={siteConfig.social.instagram}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="Feštko na Instagramu"
+                  aria-label="slavimo.hr na Instagramu"
                   className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
                 >
                   <Instagram className="h-5 w-5" aria-hidden="true" />
@@ -42,7 +42,7 @@ export function Footer({
                   href={siteConfig.social.facebook}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="Feštko na Facebooku"
+                  aria-label="slavimo.hr na Facebooku"
                   className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
                 >
                   <Facebook className="h-5 w-5" aria-hidden="true" />
@@ -50,7 +50,7 @@ export function Footer({
               ) : null}
               <a
                 href={`mailto:${siteConfig.contact.email}`}
-                aria-label="Pošalji e-mail Feštku"
+                aria-label="Pošalji nam e-mail"
                 className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
               >
                 <Mail className="h-5 w-5" aria-hidden="true" />
@@ -80,7 +80,7 @@ export function Footer({
             ))}
           </FooterColumn>
 
-          <FooterColumn title="Feštko">
+          <FooterColumn title="slavimo.hr">
             <FooterLink href="/kako-funkcionira">Kako funkcionira</FooterLink>
             <FooterLink href="/postani-partner">Postani partner</FooterLink>
             <FooterLink href="/cjenik">Cjenik</FooterLink>

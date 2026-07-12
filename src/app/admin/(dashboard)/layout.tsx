@@ -85,7 +85,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <div className="sticky top-0 z-40 border-b border-line bg-white p-3 lg:hidden">
           <details>
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 font-bold text-plum [&::-webkit-details-marker]:hidden">
-              Feštko Admin — izbornik
+              slavimo.hr Admin — izbornik
             </summary>
             <nav aria-label="Admin navigacija (mobilno)" className="mt-2 grid grid-cols-2 gap-1">
               {NAV.map((item) => (

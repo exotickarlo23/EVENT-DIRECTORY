@@ -1,10 +1,9 @@
-import Link from "next/link";
 import type { Metadata } from "next";
 import { absoluteUrl } from "@/config/site";
 import { getPublishedPosts, getBlogCategories } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { GuideCard } from "@/components/guide-card";
 import { EmptyState, ButtonLink } from "@/components/ui";
-import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Vodiči — lakše organiziraj svoj događaj",
@@ -39,28 +38,9 @@ export default function VodiciPage() {
 
       <div className="mt-10">
         {posts.length > 0 ? (
-          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {posts.map((post) => (
-              <article
-                key={post.slug}
-                className="group relative flex flex-col rounded-card border border-line bg-white p-6 shadow-card transition-all hover:-translate-y-1 hover:shadow-card-hover"
-              >
-                {post.categoryName ? (
-                  <p className="text-xs font-bold uppercase tracking-wide text-teal">{post.categoryName}</p>
-                ) : null}
-                <h2 className="mt-2 font-display text-xl font-semibold leading-snug text-plum">
-                  <Link
-                    href={`/vodici/${post.slug}`}
-                    className="after:absolute after:inset-0 after:content-[''] focus-visible:outline-none"
-                  >
-                    {post.title}
-                  </Link>
-                </h2>
-                <p className="mt-2 line-clamp-3 text-sm text-muted">{post.excerpt}</p>
-                <p className="mt-auto pt-4 text-xs text-muted">
-                  {post.author} · {formatDate(post.publishedAt)}
-                </p>
-              </article>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {posts.map((post, i) => (
+              <GuideCard key={post.slug} post={post} priority={i < 3} />
             ))}
           </div>
         ) : (

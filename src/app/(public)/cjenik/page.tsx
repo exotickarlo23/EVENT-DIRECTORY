@@ -4,6 +4,7 @@ import { absoluteUrl } from "@/config/site";
 import { getActivePricingPlans } from "@/lib/queries";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ButtonLink, Badge } from "@/components/ui";
+import { FoundingPartnersBand } from "@/components/founding-partners";
 import { Faq } from "@/components/faq";
 import { formatEur, cn } from "@/lib/utils";
 
@@ -63,6 +64,11 @@ export default function CjenikPage() {
                   <span className="font-display text-2xl font-bold text-plum">Po dogovoru</span>
                 )}
               </p>
+              {plan.price != null && plan.price > 0 && plan.period.startsWith("god") ? (
+                <p className="mt-1 text-sm font-semibold text-teal">
+                  To je samo {formatEur(Math.round((plan.price / 12) * 100) / 100)} mjesečno.
+                </p>
+              ) : null}
               <ul className="mt-6 flex-1 space-y-2.5">
                 {features.map((f, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-ink">
@@ -85,13 +91,7 @@ export default function CjenikPage() {
         })}
       </div>
 
-      <div className="mx-auto mt-12 max-w-2xl rounded-card border-2 border-gold bg-gold/10 p-6 text-center">
-        <h2 className="font-display text-xl font-bold text-plum">Posebni uvjeti za prve partnere</h2>
-        <p className="mt-2 text-sm text-muted">
-          U ranoj fazi platforme prvim partnerima nudimo posebne uvjete za istaknute profile — javi
-          se za dogovor.
-        </p>
-      </div>
+      <FoundingPartnersBand />
 
       <div className="mx-auto max-w-2xl">
         <Faq
