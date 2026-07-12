@@ -25,6 +25,8 @@ const client =
   postgres(connectionString, {
     prepare: false, // nužno za Supabase transaction pooler
     max: process.env.NODE_ENV === "production" ? 1 : 5,
+    connect_timeout: 15, // brzo javi grešku umjesto da "visi" (build/runtime)
+    idle_timeout: 20,
   });
 if (process.env.NODE_ENV !== "production") globalForDb.__sqlClient = client;
 

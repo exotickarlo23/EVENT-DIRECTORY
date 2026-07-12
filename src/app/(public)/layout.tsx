@@ -8,6 +8,11 @@ import {
   getPublishedPosts,
 } from "@/lib/queries";
 
+// Javni dio se renderira na zahtjev (SSR) — podaci dolaze iz Supabasea u
+// runtimeu, pa build ne ovisi o bazi (nema prerender-hangova). Kaskadira na sve
+// stranice unutar ovog layouta.
+export const dynamic = "force-dynamic";
+
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
   const categories = (await getCategoriesWithCounts()).map((c) => ({ slug: c.slug, name: c.name }));
   const occasions = (await getOccasions()).map((o) => ({ slug: o.slug, name: o.name }));
