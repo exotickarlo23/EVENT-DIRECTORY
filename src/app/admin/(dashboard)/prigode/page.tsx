@@ -2,8 +2,14 @@ import { getOccasions, getListings } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminPrigodePage() {
-  const occasions = getOccasions();
+export default async function AdminPrigodePage() {
+  const occasions = await getOccasions();
+  const withCounts = await Promise.all(
+    occasions.map(async (o) => ({
+      ...o,
+      count: (await getListings({ occasionSlug: o.slug, limit: 1 })).total,
+    }))
+  );
   return (
     <div className="max-w-3xl">
       <h1 className="mb-2 font-display text-2xl font-bold text-plum md:text-3xl">Prigode</h1>
@@ -12,11 +18,11 @@ export default function AdminPrigodePage() {
       </p>
       <div className="rounded-card border border-line bg-white shadow-card">
         <ul className="divide-y divide-line">
-          {occasions.map((o) => (
+          {withCounts.map((o) => (
             <li key={o.id} className="flex items-center justify-between p-4">
               <p className="font-bold text-plum">{o.name}</p>
               <p className="text-sm text-muted">
-                /prigode/{o.slug} · {getListings({ occasionSlug: o.slug, limit: 1 }).total} oglasa
+                /prigode/{o.slug} · {o.count} oglasa
               </p>
             </li>
           ))}

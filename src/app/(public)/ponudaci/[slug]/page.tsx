@@ -15,7 +15,7 @@ interface Props {
  */
 export default async function LegacyListingRedirect({ params }: Props) {
   const { slug } = await params;
-  const listing = getListingBySlug(slug);
+  const listing = await getListingBySlug(slug);
   if (!listing) notFound();
   permanentRedirect(listingPath({ slug: listing.slug, ...listingCanonicalSlugs(listing) }));
 }

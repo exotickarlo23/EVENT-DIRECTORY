@@ -37,7 +37,7 @@ export function parseBrowseParams(sp: BrowseSearchParams): Partial<Filters> & { 
 }
 
 /** Grid rezultata s filterima, brojem rezultata, paginacijom i ItemList schemom. */
-export function ListingBrowse({
+export async function ListingBrowse({
   filters,
   page,
   basePath,
@@ -58,7 +58,7 @@ export function ListingBrowse({
   emptyState?: React.ReactNode;
   categoryIcons?: Map<string, string | null>;
 }) {
-  const { items, total } = getListings({
+  const { items, total } = await getListings({
     ...filters,
     limit: PAGE_SIZE,
     offset: (page - 1) * PAGE_SIZE,

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { db, dbGet, dbRun } from "@/lib/db/client";
 import {
   listings,
   listingCategories,
@@ -112,7 +112,7 @@ export async function saveListing(
   const data = parsed.data;
 
   // Slug mora biti jedinstven
-  const existing = db.select().from(listings).where(eq(listings.slug, data.slug)).get();
+  const existing = (await db.select().from(listings).where(eq(listings.slug, data.slug)).limit(1))[0];
   if (existing && existing.id !== listingId) {
     return { ok: false, error: `Slug „${data.slug}” već postoji (oglas: ${existing.name}).` };
   }
@@ -155,48 +155,49 @@ export async function saveListing(
 
   let id = listingId;
   if (id == null) {
-    const inserted = db
-      .insert(listings)
-      .values({
-        ...values,
-        publishedAt: data.status === "published" ? now : null,
-        createdAt: now,
-      })
-      .returning({ id: listings.id })
-      .get();
-    id = inserted.id;
+    const inserted = (
+      await db
+        .insert(listings)
+        .values({
+          ...values,
+          publishedAt: data.status === "published" ? now : null,
+          createdAt: now,
+        })
+        .returning({ id: listings.id })
+    )[0];
+    id = inserted!.id;
   } else {
-    const current = db.select().from(listings).where(eq(listings.id, id)).get();
+    const current = (await db.select().from(listings).where(eq(listings.id, id)).limit(1))[0];
     if (!current) return { ok: false, error: "Oglas nije pronađen." };
-    db.update(listings)
+    await db
+      .update(listings)
       .set({
         ...values,
         publishedAt:
           data.status === "published" && !current.publishedAt ? now : current.publishedAt,
       })
-      .where(eq(listings.id, id))
-      .run();
+      .where(eq(listings.id, id));
   }
 
   // Junction tablice — obriši pa upiši ponovno
-  db.delete(listingCategories).where(eq(listingCategories.listingId, id)).run();
+  await db.delete(listingCategories).where(eq(listingCategories.listingId, id));
   const catIds = new Set(data.categoryIds);
   if (data.primaryCategoryId) catIds.add(data.primaryCategoryId);
   for (const categoryId of catIds) {
-    db.insert(listingCategories).values({ listingId: id, categoryId }).run();
+    await db.insert(listingCategories).values({ listingId: id, categoryId });
   }
-  db.delete(listingOccasions).where(eq(listingOccasions.listingId, id)).run();
+  await db.delete(listingOccasions).where(eq(listingOccasions.listingId, id));
   for (const occasionId of data.occasionIds) {
-    db.insert(listingOccasions).values({ listingId: id, occasionId }).run();
+    await db.insert(listingOccasions).values({ listingId: id, occasionId });
   }
-  db.delete(serviceAreas).where(eq(serviceAreas.listingId, id)).run();
+  await db.delete(serviceAreas).where(eq(serviceAreas.listingId, id));
   for (const locationId of data.serviceAreaIds) {
-    db.insert(serviceAreas).values({ listingId: id, locationId }).run();
+    await db.insert(serviceAreas).values({ listingId: id, locationId });
   }
 
   const duplicates =
     listingId == null
-      ? findDuplicateCandidates({
+      ? await findDuplicateCandidates({
           name: data.name,
           phone: data.phone,
           email: data.email,
@@ -212,59 +213,60 @@ export async function saveListing(
 
 export async function setListingStatus(id: number, status: ListingStatus): Promise<void> {
   await requireAdmin();
-  const current = db.select().from(listings).where(eq(listings.id, id)).get();
+  const current = (await db.select().from(listings).where(eq(listings.id, id)).limit(1))[0];
   if (!current) return;
-  db.update(listings)
+  await db
+    .update(listings)
     .set({
       status,
       publishedAt: status === "published" && !current.publishedAt ? nowIso() : current.publishedAt,
       updatedAt: nowIso(),
     })
-    .where(eq(listings.id, id))
-    .run();
+    .where(eq(listings.id, id));
   revalidatePublic();
   revalidatePath("/admin/oglasi");
 }
 
 export async function duplicateListing(id: number): Promise<void> {
   await requireAdmin();
-  const current = db.select().from(listings).where(eq(listings.id, id)).get();
+  const current = (await db.select().from(listings).where(eq(listings.id, id)).limit(1))[0];
   if (!current) return;
   const now = nowIso();
   let newSlug = `${current.slug}-kopija`;
   let n = 2;
-  while (db.select().from(listings).where(eq(listings.slug, newSlug)).get()) {
+  while ((await db.select().from(listings).where(eq(listings.slug, newSlug)).limit(1))[0]) {
     newSlug = `${current.slug}-kopija-${n++}`;
   }
-  const inserted = db
-    .insert(listings)
-    .values({
-      ...current,
-      id: undefined,
-      slug: newSlug,
-      name: `${current.name} (kopija)`,
-      status: "draft",
-      publishedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning({ id: listings.id })
-    .get();
-  db.run(sql`INSERT INTO listing_categories (listing_id, category_id)
-    SELECT ${inserted.id}, category_id FROM listing_categories WHERE listing_id = ${id}`);
-  db.run(sql`INSERT INTO listing_occasions (listing_id, occasion_id)
-    SELECT ${inserted.id}, occasion_id FROM listing_occasions WHERE listing_id = ${id}`);
-  db.run(sql`INSERT INTO service_areas (listing_id, location_id)
-    SELECT ${inserted.id}, location_id FROM service_areas WHERE listing_id = ${id}`);
+  const inserted = (
+    await db
+      .insert(listings)
+      .values({
+        ...current,
+        id: undefined,
+        slug: newSlug,
+        name: `${current.name} (kopija)`,
+        status: "draft",
+        publishedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning({ id: listings.id })
+  )[0];
+  await dbRun(sql`INSERT INTO listing_categories (listing_id, category_id)
+    SELECT ${inserted!.id}, category_id FROM listing_categories WHERE listing_id = ${id}`);
+  await dbRun(sql`INSERT INTO listing_occasions (listing_id, occasion_id)
+    SELECT ${inserted!.id}, occasion_id FROM listing_occasions WHERE listing_id = ${id}`);
+  await dbRun(sql`INSERT INTO service_areas (listing_id, location_id)
+    SELECT ${inserted!.id}, location_id FROM service_areas WHERE listing_id = ${id}`);
   revalidatePath("/admin/oglasi");
 }
 
 export async function deleteListing(id: number): Promise<void> {
   await requireAdmin();
-  db.delete(listingCategories).where(eq(listingCategories.listingId, id)).run();
-  db.delete(listingOccasions).where(eq(listingOccasions.listingId, id)).run();
-  db.delete(serviceAreas).where(eq(serviceAreas.listingId, id)).run();
-  db.delete(listings).where(eq(listings.id, id)).run();
+  await db.delete(listingCategories).where(eq(listingCategories.listingId, id));
+  await db.delete(listingOccasions).where(eq(listingOccasions.listingId, id));
+  await db.delete(serviceAreas).where(eq(serviceAreas.listingId, id));
+  await db.delete(listings).where(eq(listings.id, id));
   revalidatePublic();
   revalidatePath("/admin/oglasi");
 }
@@ -274,33 +276,33 @@ export async function deleteListing(id: number): Promise<void> {
 export async function setLeadStatus(id: number, status: string): Promise<void> {
   await requireAdmin();
   if (!["new", "read", "archived"].includes(status)) return;
-  db.update(leads).set({ status }).where(eq(leads.id, id)).run();
+  await db.update(leads).set({ status }).where(eq(leads.id, id));
   revalidatePath("/admin/upiti");
 }
 
 export async function setClaimStatus(id: number, status: string, adminNote?: string): Promise<void> {
   await requireAdmin();
   if (!["pending", "under_review", "approved", "rejected"].includes(status)) return;
-  const claim = db.select().from(claimRequests).where(eq(claimRequests.id, id)).get();
+  const claim = (await db.select().from(claimRequests).where(eq(claimRequests.id, id)).limit(1))[0];
   if (!claim) return;
-  db.update(claimRequests)
+  await db
+    .update(claimRequests)
     .set({ status: status as "pending", adminNote: adminNote ?? claim.adminNote })
-    .where(eq(claimRequests.id, id))
-    .run();
+    .where(eq(claimRequests.id, id));
   if (status === "approved") {
-    db.update(listings)
+    await db
+      .update(listings)
       .set({ claimStatus: "claimed", updatedAt: nowIso() })
-      .where(eq(listings.id, claim.listingId))
-      .run();
+      .where(eq(listings.id, claim.listingId));
   } else if (status === "rejected") {
-    const other = db.get<{ c: number }>(
-      sql`SELECT COUNT(*) c FROM claim_requests WHERE listing_id = ${claim.listingId} AND status IN ('pending','under_review') AND id != ${id}`
+    const other = await dbGet<{ c: number }>(
+      sql`SELECT COUNT(*)::int c FROM claim_requests WHERE listing_id = ${claim.listingId} AND status IN ('pending','under_review') AND id != ${id}`
     );
     if (!other || other.c === 0) {
-      db.update(listings)
+      await db
+        .update(listings)
         .set({ claimStatus: "unclaimed", updatedAt: nowIso() })
-        .where(eq(listings.id, claim.listingId))
-        .run();
+        .where(eq(listings.id, claim.listingId));
     }
   }
   revalidatePublic();
@@ -310,66 +312,69 @@ export async function setClaimStatus(id: number, status: string, adminNote?: str
 export async function setSubmissionStatus(id: number, status: string): Promise<void> {
   await requireAdmin();
   if (!["pending", "under_review", "approved", "rejected"].includes(status)) return;
-  db.update(businessSubmissions)
+  await db
+    .update(businessSubmissions)
     .set({ status: status as "pending" })
-    .where(eq(businessSubmissions.id, id))
-    .run();
+    .where(eq(businessSubmissions.id, id));
   revalidatePath("/admin/prijave-poslovanja");
 }
 
 /** Iz prijave poslovanja kreira draft oglas (bez ponovnog upisivanja podataka). */
 export async function createListingFromSubmission(submissionId: number): Promise<void> {
   await requireAdmin();
-  const sub = db.select().from(businessSubmissions).where(eq(businessSubmissions.id, submissionId)).get();
+  const sub = (
+    await db.select().from(businessSubmissions).where(eq(businessSubmissions.id, submissionId)).limit(1)
+  )[0];
   if (!sub || sub.createdListingId) return;
 
   const category = sub.categorySlug
-    ? db.select().from(categories).where(eq(categories.slug, sub.categorySlug)).get()
+    ? (await db.select().from(categories).where(eq(categories.slug, sub.categorySlug)).limit(1))[0]
     : undefined;
   const location = sub.locationName
-    ? db.select().from(locations).where(eq(locations.slug, slugify(sub.locationName))).get()
+    ? (await db.select().from(locations).where(eq(locations.slug, slugify(sub.locationName))).limit(1))[0]
     : undefined;
 
   let slug = slugify(sub.businessName);
   let n = 2;
-  while (db.select().from(listings).where(eq(listings.slug, slug)).get()) {
+  while ((await db.select().from(listings).where(eq(listings.slug, slug)).limit(1))[0]) {
     slug = `${slugify(sub.businessName)}-${n++}`;
   }
   const now = nowIso();
   const priceFrom = sub.priceFrom ? Number(sub.priceFrom.replace(/[^\d.,]/g, "").replace(",", ".")) : NaN;
-  const inserted = db
-    .insert(listings)
-    .values({
-      slug,
-      name: sub.businessName,
-      businessName: sub.businessName,
-      status: "draft",
-      claimStatus: "claimed",
-      shortDescription: (sub.description ?? "").slice(0, 200),
-      description: sub.description ?? "",
-      primaryCategoryId: category?.id ?? null,
-      baseLocationId: location?.id ?? null,
-      priceFrom: Number.isFinite(priceFrom) ? priceFrom : null,
-      priceModel: Number.isFinite(priceFrom) ? "from" : "on_request",
-      phone: sub.phone ?? null,
-      email: sub.email,
-      website: sub.website ?? null,
-      instagram: sub.instagram ?? null,
-      dataSource: `Prijava poslovanja #${sub.id}`,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning({ id: listings.id })
-    .get();
+  const inserted = (
+    await db
+      .insert(listings)
+      .values({
+        slug,
+        name: sub.businessName,
+        businessName: sub.businessName,
+        status: "draft",
+        claimStatus: "claimed",
+        shortDescription: (sub.description ?? "").slice(0, 200),
+        description: sub.description ?? "",
+        primaryCategoryId: category?.id ?? null,
+        baseLocationId: location?.id ?? null,
+        priceFrom: Number.isFinite(priceFrom) ? priceFrom : null,
+        priceModel: Number.isFinite(priceFrom) ? "from" : "on_request",
+        phone: sub.phone ?? null,
+        email: sub.email,
+        website: sub.website ?? null,
+        instagram: sub.instagram ?? null,
+        dataSource: `Prijava poslovanja #${sub.id}`,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning({ id: listings.id })
+  )[0];
   if (category) {
-    db.insert(listingCategories).values({ listingId: inserted.id, categoryId: category.id }).run();
+    await db.insert(listingCategories).values({ listingId: inserted!.id, categoryId: category.id });
   }
-  db.update(businessSubmissions)
-    .set({ status: "approved", createdListingId: inserted.id })
-    .where(eq(businessSubmissions.id, submissionId))
-    .run();
+  await db
+    .update(businessSubmissions)
+    .set({ status: "approved", createdListingId: inserted!.id })
+    .where(eq(businessSubmissions.id, submissionId));
   revalidatePath("/admin/prijave-poslovanja");
-  redirect(`/admin/oglasi/${inserted.id}`);
+  redirect(`/admin/oglasi/${inserted!.id}`);
 }
 
 // ---------- CSV import ----------
@@ -408,7 +413,8 @@ export async function previewCsvImport(_prev: CsvPreviewResult | null, formData:
     return { ok: false, error: `Nedostaju obavezni stupci: ${missing.join(", ")}` };
   }
 
-  const rows: CsvPreviewRow[] = parsed.slice(1, 201).map((cells, i) => {
+  const rows: CsvPreviewRow[] = [];
+  for (const [i, cells] of parsed.slice(1, 201).entries()) {
     const data: Record<string, string> = {};
     header.forEach((h, j) => {
       data[h] = (cells[j] ?? "").trim();
@@ -416,13 +422,13 @@ export async function previewCsvImport(_prev: CsvPreviewResult | null, formData:
     const errors: string[] = [];
     if (!data.name) errors.push("Nedostaje naziv");
     if (data.category_slug) {
-      const cat = db.select().from(categories).where(eq(categories.slug, data.category_slug)).get();
+      const cat = (await db.select().from(categories).where(eq(categories.slug, data.category_slug)).limit(1))[0];
       if (!cat) errors.push(`Nepoznata kategorija: ${data.category_slug}`);
     } else {
       errors.push("Nedostaje category_slug");
     }
     if (data.location_slug) {
-      const loc = db.select().from(locations).where(eq(locations.slug, data.location_slug)).get();
+      const loc = (await db.select().from(locations).where(eq(locations.slug, data.location_slug)).limit(1))[0];
       if (!loc) errors.push(`Nepoznata lokacija: ${data.location_slug}`);
     } else {
       errors.push("Nedostaje location_slug");
@@ -430,16 +436,18 @@ export async function previewCsvImport(_prev: CsvPreviewResult | null, formData:
     if (data.price_from && Number.isNaN(Number(data.price_from))) errors.push("price_from nije broj");
     if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) errors.push("Neispravan e-mail");
     const duplicates = data.name
-      ? findDuplicateCandidates({
-          name: data.name,
-          phone: data.phone,
-          email: data.email,
-          website: data.website,
-          instagram: data.instagram,
-        }).map((d) => ({ id: d.id, name: d.name, reason: d.reason }))
+      ? (
+          await findDuplicateCandidates({
+            name: data.name,
+            phone: data.phone,
+            email: data.email,
+            website: data.website,
+            instagram: data.instagram,
+          })
+        ).map((d) => ({ id: d.id, name: d.name, reason: d.reason }))
       : [];
-    return { rowNumber: i + 2, data, errors, duplicates };
-  });
+    rows.push({ rowNumber: i + 2, data, errors, duplicates });
+  }
 
   return { ok: true, header, rows };
 }
@@ -469,10 +477,10 @@ export async function confirmCsvImport(_prev: CsvImportResult | null, formData: 
   for (const data of rows) {
     const name = (data.name ?? "").trim();
     const category = data.category_slug
-      ? db.select().from(categories).where(eq(categories.slug, data.category_slug)).get()
+      ? (await db.select().from(categories).where(eq(categories.slug, data.category_slug)).limit(1))[0]
       : undefined;
     const location = data.location_slug
-      ? db.select().from(locations).where(eq(locations.slug, data.location_slug)).get()
+      ? (await db.select().from(locations).where(eq(locations.slug, data.location_slug)).limit(1))[0]
       : undefined;
     if (!name || !category || !location) {
       skipped++;
@@ -480,7 +488,7 @@ export async function confirmCsvImport(_prev: CsvImportResult | null, formData: 
     }
     let slug = slugify(name);
     let n = 2;
-    while (db.select().from(listings).where(eq(listings.slug, slug)).get()) {
+    while ((await db.select().from(listings).where(eq(listings.slug, slug)).limit(1))[0]) {
       slug = `${slugify(name)}-${n++}`;
     }
     const priceFrom = data.price_from ? Number(data.price_from) : NaN;
@@ -490,43 +498,43 @@ export async function confirmCsvImport(_prev: CsvImportResult | null, formData: 
       : Number.isFinite(priceFrom)
         ? "from"
         : "on_request";
-    const inserted = db
-      .insert(listings)
-      .values({
-        slug,
-        name,
-        businessName: data.business_name || name,
-        status: publish ? "published" : "draft",
-        shortDescription: (data.short_description ?? "").slice(0, 300),
-        description: data.description ?? "",
-        primaryCategoryId: category.id,
-        baseLocationId: location.id,
-        address: data.address || null,
-        priceFrom: Number.isFinite(priceFrom) ? priceFrom : null,
-        priceTo: Number.isFinite(priceTo) ? priceTo : null,
-        priceModel,
-        phone: data.phone || null,
-        whatsapp: data.whatsapp || null,
-        email: data.email || null,
-        website: data.website || null,
-        instagram: data.instagram || null,
-        facebook: data.facebook || null,
-        dataSource: data.data_source || "CSV import",
-        publishedAt: publish ? now : null,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning({ id: listings.id })
-      .get();
-    db.insert(listingCategories).values({ listingId: inserted.id, categoryId: category.id }).run();
-    // occasions: "djecji-rodendan|vjencanje"
+    const inserted = (
+      await db
+        .insert(listings)
+        .values({
+          slug,
+          name,
+          businessName: data.business_name || name,
+          status: publish ? "published" : "draft",
+          shortDescription: (data.short_description ?? "").slice(0, 300),
+          description: data.description ?? "",
+          primaryCategoryId: category.id,
+          baseLocationId: location.id,
+          address: data.address || null,
+          priceFrom: Number.isFinite(priceFrom) ? priceFrom : null,
+          priceTo: Number.isFinite(priceTo) ? priceTo : null,
+          priceModel,
+          phone: data.phone || null,
+          whatsapp: data.whatsapp || null,
+          email: data.email || null,
+          website: data.website || null,
+          instagram: data.instagram || null,
+          facebook: data.facebook || null,
+          dataSource: data.data_source || "CSV import",
+          publishedAt: publish ? now : null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning({ id: listings.id })
+    )[0];
+    await db.insert(listingCategories).values({ listingId: inserted!.id, categoryId: category.id });
     for (const occSlug of (data.occasions ?? "").split("|").map((s) => s.trim()).filter(Boolean)) {
-      const occ = db.get<{ id: number }>(sql`SELECT id FROM occasions WHERE slug = ${occSlug}`);
-      if (occ) db.insert(listingOccasions).values({ listingId: inserted.id, occasionId: occ.id }).run();
+      const occ = await dbGet<{ id: number }>(sql`SELECT id FROM occasions WHERE slug = ${occSlug}`);
+      if (occ) await db.insert(listingOccasions).values({ listingId: inserted!.id, occasionId: occ.id });
     }
     for (const areaSlug of (data.service_areas ?? "").split("|").map((s) => s.trim()).filter(Boolean)) {
-      const loc = db.get<{ id: number }>(sql`SELECT id FROM locations WHERE slug = ${areaSlug}`);
-      if (loc) db.insert(serviceAreas).values({ listingId: inserted.id, locationId: loc.id }).run();
+      const loc = await dbGet<{ id: number }>(sql`SELECT id FROM locations WHERE slug = ${areaSlug}`);
+      if (loc) await db.insert(serviceAreas).values({ listingId: inserted!.id, locationId: loc.id });
     }
     imported++;
   }

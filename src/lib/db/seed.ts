@@ -1,7 +1,6 @@
 /**
  * Seed logika — puni bazu demo podacima. Koristi je `scripts/seed.ts`
- * (npm run db:seed) te automatsko seedanje na serverless okruženju
- * (client.ts, kada je baza prazna).
+ * (npm run db:seed). Shema se primjenjuje prije seeda (scripts/schema.sql).
  *
  * Sva demo poslovanja su IZMIŠLJENA (isDemo = true). Prije produkcije
  * ukloniti demo oglase ili pokrenuti čistu bazu bez seeda oglasa.
@@ -167,58 +166,59 @@ const LOCATIONS: { name: string; county: string }[] = [
   { name: "Slavonski Brod", county: "Brodsko-posavska županija" },
 ];
 
-export function seedDatabase(db: Db): void {
+export async function seedDatabase(db: Db): Promise<void> {
   const now = nowIso();
-  const existing = db.get<{ c: number }>(sql`SELECT COUNT(*) c FROM categories`);
-  if (existing && existing.c > 0) {
-    console.log("Baza već sadrži podatke — brišem i punim ponovno (seed je idempotentan).");
-    for (const table of [
-      "listing_categories", "listing_occasions", "service_areas", "media", "packages",
-      "listing_features", "features", "reviews", "listings", "providers", "categories",
-      "occasions", "locations", "blog_posts", "blog_categories", "pricing_plans",
-    ]) {
-      db.run(sql.raw(`DELETE FROM ${table}`));
-    }
-  }
+  // Čista baza pri svakom seedu (idempotentno; resetira i serial sekvence).
+  await db.execute(
+    sql.raw(
+      "TRUNCATE listing_categories, listing_occasions, service_areas, media, packages, " +
+        "listing_features, features, reviews, listings, providers, categories, occasions, " +
+        "locations, blog_posts, blog_categories, pricing_plans RESTART IDENTITY CASCADE"
+    )
+  );
 
   // Kategorije + podkategorije
   const catIds = new Map<string, number>();
-  CATEGORIES.forEach((cat, i) => {
-    const inserted = db
-      .insert(categories)
-      .values({ slug: slugify(cat.name), name: cat.name, icon: cat.icon, description: cat.description, sortOrder: i })
-      .returning({ id: categories.id })
-      .get();
-    catIds.set(cat.name, inserted.id);
-    (cat.children ?? []).forEach((child, j) => {
-      const ins = db
+  for (const [i, cat] of CATEGORIES.entries()) {
+    const inserted = (
+      await db
         .insert(categories)
-        .values({ slug: slugify(child), name: child, parentId: inserted.id, sortOrder: j })
+        .values({ slug: slugify(cat.name), name: cat.name, icon: cat.icon, description: cat.description, sortOrder: i })
         .returning({ id: categories.id })
-        .get();
+    )[0]!;
+    catIds.set(cat.name, inserted.id);
+    for (const [j, child] of (cat.children ?? []).entries()) {
+      const ins = (
+        await db
+          .insert(categories)
+          .values({ slug: slugify(child), name: child, parentId: inserted.id, sortOrder: j })
+          .returning({ id: categories.id })
+      )[0]!;
       catIds.set(child, ins.id);
-    });
-  });
+    }
+  }
 
   const occIds = new Map<string, number>();
-  OCCASIONS.forEach((name, i) => {
-    const ins = db
-      .insert(occasions)
-      .values({ slug: slugify(name), name, sortOrder: i })
-      .returning({ id: occasions.id })
-      .get();
+  for (const [i, name] of OCCASIONS.entries()) {
+    const ins = (
+      await db
+        .insert(occasions)
+        .values({ slug: slugify(name), name, sortOrder: i })
+        .returning({ id: occasions.id })
+    )[0]!;
     occIds.set(name, ins.id);
-  });
+  }
 
   const locIds = new Map<string, number>();
-  LOCATIONS.forEach((loc, i) => {
-    const ins = db
-      .insert(locations)
-      .values({ slug: slugify(loc.name), name: loc.name, county: loc.county, sortOrder: i })
-      .returning({ id: locations.id })
-      .get();
+  for (const [i, loc] of LOCATIONS.entries()) {
+    const ins = (
+      await db
+        .insert(locations)
+        .values({ slug: slugify(loc.name), name: loc.name, county: loc.county, sortOrder: i })
+        .returning({ id: locations.id })
+    )[0]!;
     locIds.set(loc.name, ins.id);
-  });
+  }
 
   // ------------------------------------------------------------- oglasi
   interface ListingSeed {
@@ -609,92 +609,90 @@ export function seedDatabase(db: Db): void {
     },
   ];
 
-  const providerIns = db
-    .insert(providers)
-    .values({ name: "Demo ponuđači (seed)", note: "Zajednički demo provider za seed oglase", createdAt: now })
-    .returning({ id: providers.id })
-    .get();
+  const providerIns = (
+    await db
+      .insert(providers)
+      .values({ name: "Demo ponuđači (seed)", note: "Zajednički demo provider za seed oglase", createdAt: now })
+      .returning({ id: providers.id })
+  )[0]!;
 
-  LISTINGS.forEach((item, i) => {
+  for (const [i, item] of LISTINGS.entries()) {
     const catId = catIds.get(item.category);
     const locId = locIds.get(item.location);
     if (!catId || !locId) throw new Error(`Nepoznata kategorija/lokacija za ${item.name}`);
     const publishedAt = new Date(Date.now() - (i + 3) * 86_400_000).toISOString();
-    const listing = db
-      .insert(listings)
-      .values({
-        slug: slugify(item.name),
-        name: item.name,
-        businessName: `${item.name} d.o.o. (demo)`,
-        status: "published",
-        tier: item.tier ?? "free",
-        claimStatus: item.claimed ? "claimed" : "unclaimed",
-        providerId: providerIns.id,
-        shortDescription: item.short,
-        description: item.description,
-        primaryCategoryId: catId,
-        baseLocationId: locId,
-        priceFrom: item.priceFrom ?? null,
-        priceTo: item.priceTo ?? null,
-        priceModel: item.priceModel,
-        phone: item.phone ? "+385 91 000 0000" : null,
-        whatsapp: item.whatsapp ? "+385 91 000 0000" : null,
-        email: `demo-${slugify(item.name)}@example.com`,
-        website: null,
-        instagram: null,
-        servesAtClientLocation: item.atClientLocation ?? false,
-        featuredWeight: item.featuredWeight ?? 0,
-        featuredUntil: item.featuredUntil ?? null,
-        publishedAt,
-        dataSource: "Seed demo podaci",
-        isDemo: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning({ id: listings.id })
-      .get();
+    const listing = (
+      await db
+        .insert(listings)
+        .values({
+          slug: slugify(item.name),
+          name: item.name,
+          businessName: `${item.name} d.o.o. (demo)`,
+          status: "published",
+          tier: item.tier ?? "free",
+          claimStatus: item.claimed ? "claimed" : "unclaimed",
+          providerId: providerIns.id,
+          shortDescription: item.short,
+          description: item.description,
+          primaryCategoryId: catId,
+          baseLocationId: locId,
+          priceFrom: item.priceFrom ?? null,
+          priceTo: item.priceTo ?? null,
+          priceModel: item.priceModel,
+          phone: item.phone ? "+385 91 000 0000" : null,
+          whatsapp: item.whatsapp ? "+385 91 000 0000" : null,
+          email: `demo-${slugify(item.name)}@example.com`,
+          website: null,
+          instagram: null,
+          servesAtClientLocation: item.atClientLocation ?? false,
+          featuredWeight: item.featuredWeight ?? 0,
+          featuredUntil: item.featuredUntil ?? null,
+          publishedAt,
+          dataSource: "Seed demo podaci",
+          isDemo: true,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning({ id: listings.id })
+    )[0]!;
 
-    db.insert(listingCategories).values({ listingId: listing.id, categoryId: catId }).run();
+    await db.insert(listingCategories).values({ listingId: listing.id, categoryId: catId });
     for (const sub of item.subcategories ?? []) {
       const subId = catIds.get(sub);
-      if (subId) db.insert(listingCategories).values({ listingId: listing.id, categoryId: subId }).run();
+      if (subId) await db.insert(listingCategories).values({ listingId: listing.id, categoryId: subId });
     }
     for (const occ of item.occasions) {
       const occId = occIds.get(occ);
-      if (occId) db.insert(listingOccasions).values({ listingId: listing.id, occasionId: occId }).run();
+      if (occId) await db.insert(listingOccasions).values({ listingId: listing.id, occasionId: occId });
     }
     for (const area of item.serviceAreas ?? []) {
       const areaId = locIds.get(area);
-      if (areaId) db.insert(serviceAreas).values({ listingId: listing.id, locationId: areaId }).run();
+      if (areaId) await db.insert(serviceAreas).values({ listingId: listing.id, locationId: areaId });
     }
-    (item.packages ?? []).forEach((pkg, j) => {
-      db.insert(packages)
-        .values({
-          listingId: listing.id,
-          name: pkg.name,
-          priceFrom: pkg.priceFrom,
-          includes: JSON.stringify(pkg.includes),
-          sortOrder: j,
-        })
-        .run();
-    });
-  });
+    for (const [j, pkg] of (item.packages ?? []).entries()) {
+      await db.insert(packages).values({
+        listingId: listing.id,
+        name: pkg.name,
+        priceFrom: pkg.priceFrom,
+        includes: JSON.stringify(pkg.includes),
+        sortOrder: j,
+      });
+    }
+  }
 
   // Jedan draft primjer za admin pregled
-  db.insert(listings)
-    .values({
-      slug: "primjer-draft-oglasa",
-      name: "Primjer draft oglasa",
-      status: "draft",
-      shortDescription: "Ovaj oglas je u statusu draft i nije vidljiv javno.",
-      primaryCategoryId: catIds.get("Catering i hrana"),
-      baseLocationId: locIds.get("Zagreb"),
-      isDemo: true,
-      dataSource: "Seed demo podaci",
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  await db.insert(listings).values({
+    slug: "primjer-draft-oglasa",
+    name: "Primjer draft oglasa",
+    status: "draft",
+    shortDescription: "Ovaj oglas je u statusu draft i nije vidljiv javno.",
+    primaryCategoryId: catIds.get("Catering i hrana"),
+    baseLocationId: locIds.get("Zagreb"),
+    isDemo: true,
+    dataSource: "Seed demo podaci",
+    createdAt: now,
+    updatedAt: now,
+  });
 
   // ------------------------------------------------------------- blog
   const BLOG_CATS = [
@@ -709,14 +707,15 @@ export function seedDatabase(db: Db): void {
     "Event-oprema",
   ];
   const blogCatIds = new Map<string, number>();
-  BLOG_CATS.forEach((name, i) => {
-    const ins = db
-      .insert(blogCategories)
-      .values({ slug: slugify(name), name, sortOrder: i })
-      .returning({ id: blogCategories.id })
-      .get();
+  for (const [i, name] of BLOG_CATS.entries()) {
+    const ins = (
+      await db
+        .insert(blogCategories)
+        .values({ slug: slugify(name), name, sortOrder: i })
+        .returning({ id: blogCategories.id })
+    )[0]!;
     blogCatIds.set(name, ins.id);
-  });
+  }
 
   const POSTS = [
     {
@@ -843,28 +842,27 @@ Ako je proslava duža od 3 sata ili ima više od 12-ero djece, kombinacija napuh
     },
   ];
 
-  POSTS.forEach((post, i) => {
+  for (const [i, post] of POSTS.entries()) {
     const publishedAt = new Date(Date.now() - (i + 5) * 86_400_000).toISOString();
-    db.insert(blogPosts)
-      .values({
-        slug: slugify(post.title),
-        title: post.title,
-        excerpt: post.excerpt,
-        content: post.content,
-        categoryId: blogCatIds.get(post.category) ?? null,
-        seoTitle: `${post.title} | slavimo.hr vodiči`,
-        seoDescription: post.excerpt,
-        faq: JSON.stringify(post.faq),
-        relatedCategorySlugs: JSON.stringify(post.related),
-        status: "published",
-        publishedAt,
-        updatedAt: publishedAt,
-      })
-      .run();
-  });
+    await db.insert(blogPosts).values({
+      slug: slugify(post.title),
+      title: post.title,
+      excerpt: post.excerpt,
+      content: post.content,
+      categoryId: blogCatIds.get(post.category) ?? null,
+      seoTitle: `${post.title} | slavimo.hr vodiči`,
+      seoDescription: post.excerpt,
+      faq: JSON.stringify(post.faq),
+      relatedCategorySlugs: JSON.stringify(post.related),
+      status: "published",
+      publishedAt,
+      updatedAt: publishedAt,
+    });
+  }
 
   // ------------------------------------------------------------- cjenik
-  db.insert(pricingPlans)
+  await db
+    .insert(pricingPlans)
     .values([
       {
         slug: "osnovni",
@@ -902,15 +900,15 @@ Ako je proslava duža od 3 sata ili ima više od 12-ero djece, kombinacija napuh
         highlighted: true,
         sortOrder: 2,
       },
-    ])
-    .run();
+    ]);
 
-  const counts = {
-    kategorije: db.get<{ c: number }>(sql`SELECT COUNT(*) c FROM categories`)?.c,
-    lokacije: db.get<{ c: number }>(sql`SELECT COUNT(*) c FROM locations`)?.c,
-    prigode: db.get<{ c: number }>(sql`SELECT COUNT(*) c FROM occasions`)?.c,
-    oglasi: db.get<{ c: number }>(sql`SELECT COUNT(*) c FROM listings`)?.c,
-    clanci: db.get<{ c: number }>(sql`SELECT COUNT(*) c FROM blog_posts`)?.c,
-  };
-  console.log("Seed dovršen:", counts);
+  const count = async (table: string) =>
+    ((await db.execute(sql.raw(`SELECT COUNT(*)::int c FROM ${table}`))) as unknown as { c: number }[])[0]?.c;
+  console.log("Seed dovršen:", {
+    kategorije: await count("categories"),
+    lokacije: await count("locations"),
+    prigode: await count("occasions"),
+    oglasi: await count("listings"),
+    clanci: await count("blog_posts"),
+  });
 }

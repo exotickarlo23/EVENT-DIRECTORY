@@ -18,10 +18,9 @@ interface Props {
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { occasion, location } = await params;
   const sp = await searchParams;
-  const occ = getOccasionBySlug(occasion);
-  const loc = getLocationBySlug(location);
+  const [occ, loc] = await Promise.all([getOccasionBySlug(occasion), getLocationBySlug(location)]);
   if (!occ || !loc) return {};
-  const { total } = getListings({ occasionSlug: occasion, locationSlug: location, limit: 1 });
+  const { total } = await getListings({ occasionSlug: occasion, locationSlug: location, limit: 1 });
   return {
     title: `${occ.name} ${loc.name} — usluge i ponuđači`,
     description: `Usluge za prigodu ${occ.name.toLowerCase()} u gradu ${loc.name}: usporedi ponuđače i pošalji izravan upit preko Feštka.`,
@@ -33,12 +32,11 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 export default async function OccasionLocationPage({ params, searchParams }: Props) {
   const { occasion, location } = await params;
   const sp = await searchParams;
-  const occ = getOccasionBySlug(occasion);
-  const loc = getLocationBySlug(location);
+  const [occ, loc] = await Promise.all([getOccasionBySlug(occasion), getLocationBySlug(location)]);
   if (!occ || !loc) notFound();
 
   const { page, ...filters } = parseBrowseParams(sp);
-  const allCategories = getCategoriesWithCounts();
+  const allCategories = await getCategoriesWithCounts();
   const categoryIcons = new Map(allCategories.map((c) => [c.slug, c.icon]));
 
   return (

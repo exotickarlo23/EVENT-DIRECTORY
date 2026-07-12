@@ -8,13 +8,13 @@ import {
   getPublishedPosts,
 } from "@/lib/queries";
 
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
-  const categories = getCategoriesWithCounts().map((c) => ({ slug: c.slug, name: c.name }));
-  const occasions = getOccasions().map((o) => ({ slug: o.slug, name: o.name }));
-  const locations = getLocationsWithCounts()
+export default async function PublicLayout({ children }: { children: React.ReactNode }) {
+  const categories = (await getCategoriesWithCounts()).map((c) => ({ slug: c.slug, name: c.name }));
+  const occasions = (await getOccasions()).map((o) => ({ slug: o.slug, name: o.name }));
+  const locations = (await getLocationsWithCounts())
     .filter((l) => l.listingCount > 0)
     .map((l) => ({ slug: l.slug, name: l.name }));
-  const guides = getPublishedPosts(3).map((p) => ({ slug: p.slug, name: p.title }));
+  const guides = (await getPublishedPosts(3)).map((p) => ({ slug: p.slug, name: p.title }));
 
   return (
     <>

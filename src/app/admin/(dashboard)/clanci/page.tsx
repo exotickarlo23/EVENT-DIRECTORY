@@ -5,8 +5,8 @@ import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminClanciPage() {
-  const posts = getAllPosts();
+export default async function AdminClanciPage() {
+  const posts = await getAllPosts();
   return (
     <div className="max-w-3xl">
       <h1 className="mb-2 font-display text-2xl font-bold text-plum md:text-3xl">Članci / vodiči</h1>

@@ -5,8 +5,8 @@ import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminUpitiPage() {
-  const items = getAdminLeads();
+export default async function AdminUpitiPage() {
+  const items = await getAdminLeads();
 
   return (
     <div>

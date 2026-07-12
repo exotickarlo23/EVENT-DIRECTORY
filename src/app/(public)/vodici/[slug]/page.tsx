@@ -23,7 +23,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPostBySlug(slug);
   if (!post) return {};
   return {
     title: post.seoTitle ?? post.title,
@@ -40,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function VodicPage({ params }: Props) {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPostBySlug(slug);
   if (!post) notFound();
 
   const headings = extractHeadings(post.content);
@@ -58,14 +58,16 @@ export default async function VodicPage({ params }: Props) {
       return [];
     }
   })();
-  const relatedCategories = relatedSlugs
-    .map((s) => getCategoryBySlug(s))
-    .filter((c): c is NonNullable<ReturnType<typeof getCategoryBySlug>> => c != null);
-  const relatedListingIds = relatedSlugs.flatMap(
-    (s) => getListings({ categorySlug: s, limit: 2 }).items.map((l) => l.id)
+  const relatedCategoriesResolved = await Promise.all(relatedSlugs.map((s) => getCategoryBySlug(s)));
+  const relatedCategories = relatedCategoriesResolved.filter(
+    (c): c is NonNullable<Awaited<ReturnType<typeof getCategoryBySlug>>> => c != null
   );
-  const relatedListings = getListingCardsByIds([...new Set(relatedListingIds)].slice(0, 3));
-  const otherPosts = getPublishedPosts().filter((p) => p.slug !== slug).slice(0, 3);
+  const relatedIdsNested = await Promise.all(
+    relatedSlugs.map(async (s) => (await getListings({ categorySlug: s, limit: 2 })).items.map((l) => l.id))
+  );
+  const relatedListingIds = relatedIdsNested.flat();
+  const relatedListings = await getListingCardsByIds([...new Set(relatedListingIds)].slice(0, 3));
+  const otherPosts = (await getPublishedPosts()).filter((p) => p.slug !== slug).slice(0, 3);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

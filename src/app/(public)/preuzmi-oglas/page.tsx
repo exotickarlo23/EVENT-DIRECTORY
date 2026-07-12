@@ -22,7 +22,7 @@ interface Props {
 
 export default async function PreuzmiOglasPage({ searchParams }: Props) {
   const { listing: listingSlug } = await searchParams;
-  const listing = listingSlug ? getListingBySlug(listingSlug) : null;
+  const listing = listingSlug ? await getListingBySlug(listingSlug) : null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">

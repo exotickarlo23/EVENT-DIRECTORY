@@ -20,9 +20,9 @@ interface Props {
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { occasion } = await params;
   const sp = await searchParams;
-  const occ = getOccasionBySlug(occasion);
+  const occ = await getOccasionBySlug(occasion);
   if (!occ) return {};
-  const { total } = getListings({ occasionSlug: occasion, limit: 1 });
+  const { total } = await getListings({ occasionSlug: occasion, limit: 1 });
   return {
     title: `${occ.name} — usluge i ponuđači`,
     description: `Sve usluge za prigodu ${occ.name.toLowerCase()}: zabava, catering, dekoracije, prostori i oprema. Usporedi ponude i pošalji izravan upit.`,
@@ -34,17 +34,24 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 export default async function OccasionPage({ params, searchParams }: Props) {
   const { occasion } = await params;
   const sp = await searchParams;
-  const occ = getOccasionBySlug(occasion);
+  const occ = await getOccasionBySlug(occasion);
   if (!occ) notFound();
 
   const { page, ...filters } = parseBrowseParams(sp);
-  const locations = getLocationsWithCounts().filter((l) => l.listingCount > 0);
-  const allCategories = getCategoriesWithCounts();
+  const [locationsAll, allCategories] = await Promise.all([
+    getLocationsWithCounts(),
+    getCategoriesWithCounts(),
+  ]);
+  const locations = locationsAll.filter((l) => l.listingCount > 0);
   const categoryIcons = new Map(allCategories.map((c) => [c.slug, c.icon]));
 
-  const locationsWithOffer = locations.filter(
-    (l) => getListings({ occasionSlug: occasion, locationSlug: l.slug, limit: 1 }).total > 0
+  const locWithOfferTotals = await Promise.all(
+    locations.map(async (l) => ({
+      l,
+      total: (await getListings({ occasionSlug: occasion, locationSlug: l.slug, limit: 1 })).total,
+    }))
   );
+  const locationsWithOffer = locWithOfferTotals.filter((x) => x.total > 0).map((x) => x.l);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

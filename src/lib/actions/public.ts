@@ -1,14 +1,14 @@
 "use server";
 
 import { headers } from "next/headers";
-import { sql } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { sql, eq } from "drizzle-orm";
+import { db, dbRun } from "@/lib/db/client";
 import { leads, claimRequests, businessSubmissions, analyticsEvents, listings } from "@/lib/db/schema";
 import { leadSchema, claimSchema, businessSubmissionSchema } from "@/lib/validation";
 import { rateLimit } from "@/lib/rate-limit";
 import { notifyAdmin, sendEmail } from "@/lib/email";
 import { nowIso } from "@/lib/utils";
-import { eq } from "drizzle-orm";
+import { getListingCardsByIds } from "@/lib/queries";
 
 export interface FormResult {
   ok: boolean;
@@ -42,32 +42,30 @@ export async function submitLead(_prev: FormResult | null, formData: FormData): 
   }
   const data = parsed.data;
 
-  db.insert(leads)
-    .values({
-      listingId: data.listingId ?? null,
-      name: data.name,
-      email: data.email,
-      phone: data.phone ?? null,
-      eventDate: data.eventDate ?? null,
-      eventLocation: data.eventLocation ?? null,
-      eventType: data.eventType ?? null,
-      message: data.message,
-      createdAt: nowIso(),
-    })
-    .run();
+  await db.insert(leads).values({
+    listingId: data.listingId ?? null,
+    name: data.name,
+    email: data.email,
+    phone: data.phone ?? null,
+    eventDate: data.eventDate ?? null,
+    eventLocation: data.eventLocation ?? null,
+    eventType: data.eventType ?? null,
+    message: data.message,
+    createdAt: nowIso(),
+  });
 
-  db.insert(analyticsEvents)
-    .values({ type: "lead_submitted", listingId: data.listingId ?? null, createdAt: nowIso() })
-    .run();
+  await db
+    .insert(analyticsEvents)
+    .values({ type: "lead_submitted", listingId: data.listingId ?? null, createdAt: nowIso() });
 
   let listingName = "";
   if (data.listingId) {
-    const listing = db.select().from(listings).where(eq(listings.id, data.listingId)).get();
+    const listing = (await db.select().from(listings).where(eq(listings.id, data.listingId)).limit(1))[0];
     listingName = listing?.name ?? "";
     if (listing?.email) {
       await sendEmail({
         to: listing.email,
-        subject: `Novi upit preko Feštka — ${listing.name}`,
+        subject: `Novi upit preko slavimo.hr — ${listing.name}`,
         text: `Ime: ${data.name}\nE-mail: ${data.email}\nTelefon: ${data.phone ?? "-"}\nDatum: ${data.eventDate ?? "-"}\nLokacija: ${data.eventLocation ?? "-"}\nVrsta događaja: ${data.eventType ?? "-"}\n\nPoruka:\n${data.message}`,
       });
     }
@@ -89,33 +87,31 @@ export async function submitClaim(_prev: FormResult | null, formData: FormData):
     return { ok: false, error: "Provjeri označena polja.", fieldErrors: zodFieldErrors(parsed.error) };
   }
   const data = parsed.data;
-  const listing = db.select().from(listings).where(eq(listings.id, data.listingId)).get();
+  const listing = (await db.select().from(listings).where(eq(listings.id, data.listingId)).limit(1))[0];
   if (!listing) return { ok: false, error: "Oglas nije pronađen." };
 
-  db.insert(claimRequests)
-    .values({
-      listingId: data.listingId,
-      fullName: data.fullName,
-      email: data.email,
-      phone: data.phone ?? null,
-      role: data.role ?? null,
-      website: data.website ?? null,
-      proofMethod: data.proofMethod ?? null,
-      message: data.message ?? null,
-      createdAt: nowIso(),
-    })
-    .run();
+  await db.insert(claimRequests).values({
+    listingId: data.listingId,
+    fullName: data.fullName,
+    email: data.email,
+    phone: data.phone ?? null,
+    role: data.role ?? null,
+    website: data.website ?? null,
+    proofMethod: data.proofMethod ?? null,
+    message: data.message ?? null,
+    createdAt: nowIso(),
+  });
 
   if (listing.claimStatus === "unclaimed") {
-    db.update(listings)
+    await db
+      .update(listings)
       .set({ claimStatus: "claim_pending", updatedAt: nowIso() })
-      .where(eq(listings.id, listing.id))
-      .run();
+      .where(eq(listings.id, listing.id));
   }
 
-  db.insert(analyticsEvents)
-    .values({ type: "claim_submitted", listingId: data.listingId, createdAt: nowIso() })
-    .run();
+  await db
+    .insert(analyticsEvents)
+    .values({ type: "claim_submitted", listingId: data.listingId, createdAt: nowIso() });
 
   await notifyAdmin(
     `Zahtjev za preuzimanje profila — ${listing.name}`,
@@ -135,28 +131,26 @@ export async function submitBusiness(_prev: FormResult | null, formData: FormDat
   }
   const data = parsed.data;
 
-  db.insert(businessSubmissions)
-    .values({
-      businessName: data.businessName,
-      contactName: data.contactName,
-      email: data.email,
-      phone: data.phone ?? null,
-      website: data.website ?? null,
-      instagram: data.instagram ?? null,
-      categorySlug: data.categorySlug ?? null,
-      locationName: data.locationName ?? null,
-      serviceArea: data.serviceArea ?? null,
-      description: data.description ?? null,
-      priceFrom: data.priceFrom ?? null,
-      photosUrl: data.photosUrl ?? null,
-      note: data.note ?? null,
-      createdAt: nowIso(),
-    })
-    .run();
+  await db.insert(businessSubmissions).values({
+    businessName: data.businessName,
+    contactName: data.contactName,
+    email: data.email,
+    phone: data.phone ?? null,
+    website: data.website ?? null,
+    instagram: data.instagram ?? null,
+    categorySlug: data.categorySlug ?? null,
+    locationName: data.locationName ?? null,
+    serviceArea: data.serviceArea ?? null,
+    description: data.description ?? null,
+    priceFrom: data.priceFrom ?? null,
+    photosUrl: data.photosUrl ?? null,
+    note: data.note ?? null,
+    createdAt: nowIso(),
+  });
 
-  db.insert(analyticsEvents)
-    .values({ type: "business_submission_completed", createdAt: nowIso() })
-    .run();
+  await db
+    .insert(analyticsEvents)
+    .values({ type: "business_submission_completed", createdAt: nowIso() });
 
   await notifyAdmin(
     `Nova prijava poslovanja — ${data.businessName}`,
@@ -184,22 +178,24 @@ export async function trackEvent(type: string, listingId?: number, meta?: string
   if (!allowed.has(type)) return;
   const key = await clientKey("analytics");
   if (!rateLimit(key, { limit: 60, windowMs: 60_000 }).ok) return;
-  db.insert(analyticsEvents)
-    .values({
+  try {
+    await db.insert(analyticsEvents).values({
       type,
       listingId: listingId ?? null,
       meta: meta ? meta.slice(0, 500) : null,
       createdAt: nowIso(),
-    })
-    .run();
+    });
+  } catch {
+    // analitika nikad ne smije srušiti stranicu
+  }
 }
 
 /** Broj pregleda oglasa — poziva se iz server komponente stranice oglasa. */
 export async function recordListingView(listingId: number, path: string): Promise<void> {
   try {
-    db.insert(analyticsEvents)
-      .values({ type: "listing_viewed", listingId, path, createdAt: nowIso() })
-      .run();
+    await db
+      .insert(analyticsEvents)
+      .values({ type: "listing_viewed", listingId, path, createdAt: nowIso() });
   } catch {
     // analitika nikad ne smije srušiti stranicu
   }
@@ -207,15 +203,14 @@ export async function recordListingView(listingId: number, path: string): Promis
 
 /** Dohvat kartica oglasa po ID-jevima — za favorite i usporedbu (localStorage). */
 export async function getListingCards(ids: number[]) {
-  const { getListingCardsByIds } = await import("@/lib/queries");
   const safe = ids.filter((n) => Number.isInteger(n) && n > 0).slice(0, 50);
   return getListingCardsByIds(safe);
 }
 
-/** SQL helper za brzu provjeru (koristi se u testovima okoline). */
+/** Brza provjera konekcije na bazu. */
 export async function pingDb(): Promise<boolean> {
   try {
-    db.get(sql`SELECT 1`);
+    await dbRun(sql`SELECT 1`);
     return true;
   } catch {
     return false;

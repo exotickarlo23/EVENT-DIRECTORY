@@ -13,8 +13,8 @@ const STATUS_BADGE: Record<string, { label: string; variant: "warning" | "neutra
   rejected: { label: "Odbijeno", variant: "danger" },
 };
 
-export default function AdminPrijavePage() {
-  const items = getAdminSubmissions();
+export default async function AdminPrijavePage() {
+  const items = await getAdminSubmissions();
 
   return (
     <div>

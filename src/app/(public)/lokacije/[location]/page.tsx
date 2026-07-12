@@ -20,9 +20,9 @@ interface Props {
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { location } = await params;
   const sp = await searchParams;
-  const loc = getLocationBySlug(location);
+  const loc = await getLocationBySlug(location);
   if (!loc) return {};
-  const { total } = getListings({ locationSlug: location, limit: 1 });
+  const { total } = await getListings({ locationSlug: location, limit: 1 });
   return {
     title: `Event-usluge ${loc.name} — ponuda i cijene`,
     description: `Sve event-usluge dostupne u gradu ${loc.name}: zabava, catering, prostori, dekoracije i oprema. Usporedi ponude i pošalji izravan upit.`,
@@ -34,16 +34,19 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 export default async function LocationPage({ params, searchParams }: Props) {
   const { location } = await params;
   const sp = await searchParams;
-  const loc = getLocationBySlug(location);
+  const loc = await getLocationBySlug(location);
   if (!loc) notFound();
 
   const { page, ...filters } = parseBrowseParams(sp);
-  const occasions = getOccasions();
-  const allCategories = getCategoriesWithCounts();
+  const [occasions, allCategories] = await Promise.all([getOccasions(), getCategoriesWithCounts()]);
   const categoryIcons = new Map(allCategories.map((c) => [c.slug, c.icon]));
-  const categoriesHere = allCategories.filter(
-    (c) => getListings({ categorySlug: c.slug, locationSlug: location, limit: 1 }).total > 0
+  const categoriesHereTotals = await Promise.all(
+    allCategories.map(async (c) => ({
+      c,
+      total: (await getListings({ categorySlug: c.slug, locationSlug: location, limit: 1 })).total,
+    }))
   );
+  const categoriesHere = categoriesHereTotals.filter((x) => x.total > 0).map((x) => x.c);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

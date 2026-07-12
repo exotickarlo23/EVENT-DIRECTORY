@@ -14,7 +14,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const listing = getListingBySlug(slug);
+  const listing = await getListingBySlug(slug);
   if (!listing) return {};
   const canonical = listingPath({ slug: listing.slug, ...listingCanonicalSlugs(listing) });
   return {
@@ -30,7 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ListingCanonicalPage({ params }: Props) {
   const { category, location, slug } = await params;
-  const listing = getListingBySlug(slug);
+  const listing = await getListingBySlug(slug);
   if (!listing) notFound();
 
   // Kanonski URL se izvodi iz podataka; svaka druga kombinacija kategorije/lokacije

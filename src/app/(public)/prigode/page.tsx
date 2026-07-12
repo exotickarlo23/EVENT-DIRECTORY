@@ -12,8 +12,14 @@ export const metadata: Metadata = {
   alternates: { canonical: absoluteUrl("/prigode") },
 };
 
-export default function PrigodePage() {
-  const occasions = getOccasions();
+export default async function PrigodePage() {
+  const occasions = await getOccasions();
+  const withCounts = await Promise.all(
+    occasions.map(async (occ) => ({
+      ...occ,
+      total: (await getListings({ occasionSlug: occ.slug, limit: 1 })).total,
+    }))
+  );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
@@ -23,8 +29,8 @@ export default function PrigodePage() {
         Odaberi prigodu i pronađi ponuđače koji imaju iskustva baš s takvim događajima.
       </p>
       <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-        {occasions.map((occ) => {
-          const { total } = getListings({ occasionSlug: occ.slug, limit: 1 });
+        {withCounts.map((occ) => {
+          const total = occ.total;
           return (
             <Link
               key={occ.slug}

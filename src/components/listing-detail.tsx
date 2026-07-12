@@ -14,15 +14,15 @@ import { Faq } from "@/components/faq";
 import { formatPrice, formatDate, isFeaturedActive } from "@/lib/utils";
 
 /** Cijeli javni prikaz detalja oglasa. Koristi ga kanonski route. */
-export function ListingDetailView({
+export async function ListingDetailView({
   listing,
   canonicalPath,
 }: {
   listing: ListingDetail;
   canonicalPath: string;
 }) {
-  const related = getRelatedListings(listing, 3);
-  const categoryIcons = new Map(getCategoriesWithCounts().map((c) => [c.slug, c.icon]));
+  const related = await getRelatedListings(listing, 3);
+  const categoryIcons = new Map((await getCategoriesWithCounts()).map((c) => [c.slug, c.icon]));
   const featured = isFeaturedActive(listing);
   const unclaimed = listing.claimStatus !== "claimed";
 

@@ -29,11 +29,14 @@ export const metadata: Metadata = {
   alternates: { canonical: absoluteUrl("/") },
 };
 
-export default function HomePage() {
-  const categories = getCategoriesWithCounts();
-  const featured = getFeaturedListings(8);
-  const locations = getLocationsWithCounts().filter((l) => l.listingCount > 0);
-  const posts = getPublishedPosts(3);
+export default async function HomePage() {
+  const [categories, featured, locationsAll, posts] = await Promise.all([
+    getCategoriesWithCounts(),
+    getFeaturedListings(8),
+    getLocationsWithCounts(),
+    getPublishedPosts(3),
+  ]);
+  const locations = locationsAll.filter((l) => l.listingCount > 0);
   const categoryIcons = new Map(categories.map((c) => [c.slug, c.icon]));
 
   return (

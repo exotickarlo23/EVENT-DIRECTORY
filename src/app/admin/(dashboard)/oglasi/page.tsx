@@ -29,7 +29,7 @@ interface Props {
 
 export default async function AdminOglasiPage({ searchParams }: Props) {
   const sp = await searchParams;
-  const listings = getAdminListings({ status: sp.status, q: sp.q });
+  const listings = await getAdminListings({ status: sp.status, q: sp.q });
 
   return (
     <div>

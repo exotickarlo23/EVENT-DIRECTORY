@@ -2,8 +2,8 @@ import { getCategoriesWithCounts } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminKategorijePage() {
-  const categories = getCategoriesWithCounts();
+export default async function AdminKategorijePage() {
+  const categories = await getCategoriesWithCounts();
   return (
     <div className="max-w-3xl">
       <h1 className="mb-2 font-display text-2xl font-bold text-plum md:text-3xl">Kategorije</h1>

@@ -11,9 +11,9 @@ export const metadata: Metadata = {
   alternates: { canonical: absoluteUrl("/dodaj-poslovanje") },
 };
 
-export default function DodajPoslovanjePage() {
-  const categories = getCategoriesWithCounts().map((c) => ({ slug: c.slug, name: c.name }));
-  const locations = getLocationsWithCounts().map((l) => ({ slug: l.slug, name: l.name }));
+export default async function DodajPoslovanjePage() {
+  const categories = (await getCategoriesWithCounts()).map((c) => ({ slug: c.slug, name: c.name }));
+  const locations = (await getLocationsWithCounts()).map((l) => ({ slug: l.slug, name: l.name }));
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">

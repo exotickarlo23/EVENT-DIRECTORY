@@ -21,11 +21,15 @@ interface Props {
 export default async function PretragaPage({ searchParams }: Props) {
   const sp = await searchParams;
   const { page, ...filters } = parseBrowseParams(sp);
-  const locations = getLocationsWithCounts().filter((l) => l.listingCount > 0);
-  const occasions = getOccasions();
-  const allCategories = getCategoriesWithCounts();
+  const [locationsAll, occasions, allCategories, totalRes] = await Promise.all([
+    getLocationsWithCounts(),
+    getOccasions(),
+    getCategoriesWithCounts(),
+    getListings({ ...filters, limit: 1 }),
+  ]);
+  const locations = locationsAll.filter((l) => l.listingCount > 0);
   const categoryIcons = new Map(allCategories.map((c) => [c.slug, c.icon]));
-  const { total } = getListings({ ...filters, limit: 1 });
+  const total = totalRes.total;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

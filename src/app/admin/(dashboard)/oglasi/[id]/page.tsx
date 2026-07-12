@@ -23,15 +23,20 @@ export default async function UrediOglasPage({ params }: Props) {
   const { id } = await params;
   const listingId = Number(id);
   if (!Number.isInteger(listingId)) notFound();
-  const listing = getAdminListingById(listingId);
+  const listing = await getAdminListingById(listingId);
   if (!listing) notFound();
 
-  const listingLeads = db
+  const [categories, locations, occasions] = await Promise.all([
+    getAllCategoriesFlat(),
+    getAllLocations(),
+    getAllOccasions(),
+  ]);
+
+  const listingLeads = await db
     .select()
     .from(leads)
     .where(eq(leads.listingId, listingId))
-    .orderBy(desc(leads.createdAt))
-    .all();
+    .orderBy(desc(leads.createdAt));
 
   return (
     <div>
@@ -47,9 +52,9 @@ export default async function UrediOglasPage({ params }: Props) {
 
       <ListingForm
         listing={listing}
-        categories={getAllCategoriesFlat()}
-        locations={getAllLocations()}
-        occasions={getAllOccasions()}
+        categories={categories}
+        locations={locations}
+        occasions={occasions}
         selected={{
           categoryIds: listing.categoryIds,
           occasionIds: listing.occasionIds,

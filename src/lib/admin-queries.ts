@@ -1,6 +1,6 @@
 import "server-only";
 import { sql, desc, eq, asc } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { db, dbAll, dbGet } from "@/lib/db/client";
 import {
   listings,
   businessSubmissions,
@@ -28,24 +28,40 @@ export interface DashboardStats {
   leadsSubmitted: number;
 }
 
-export function getDashboardStats(): DashboardStats {
-  const one = (q: ReturnType<typeof sql>) => db.get<{ c: number }>(q)?.c ?? 0;
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const one = async (q: ReturnType<typeof sql>) => (await dbGet<{ c: number }>(q))?.c ?? 0;
   return {
-    totalPublished: one(sql`SELECT COUNT(*) c FROM listings WHERE status = 'published'`),
-    freeCount: one(sql`SELECT COUNT(*) c FROM listings WHERE status = 'published' AND tier = 'free'`),
-    featuredCount: one(sql`SELECT COUNT(*) c FROM listings WHERE status = 'published' AND tier = 'featured'`),
-    featuredExpiringSoon: one(sql`
-      SELECT COUNT(*) c FROM listings
+    totalPublished: await one(sql`SELECT COUNT(*)::int c FROM listings WHERE status = 'published'`),
+    freeCount: await one(
+      sql`SELECT COUNT(*)::int c FROM listings WHERE status = 'published' AND tier = 'free'`
+    ),
+    featuredCount: await one(
+      sql`SELECT COUNT(*)::int c FROM listings WHERE status = 'published' AND tier = 'featured'`
+    ),
+    featuredExpiringSoon: await one(sql`
+      SELECT COUNT(*)::int c FROM listings
       WHERE tier = 'featured' AND featured_until IS NOT NULL
-        AND featured_until BETWEEN datetime('now') AND datetime('now', '+14 days')
+        AND featured_until::timestamptz BETWEEN now() AND now() + interval '14 days'
     `),
-    newLeads: one(sql`SELECT COUNT(*) c FROM leads WHERE status = 'new'`),
-    pendingClaims: one(sql`SELECT COUNT(*) c FROM claim_requests WHERE status IN ('pending','under_review')`),
-    pendingSubmissions: one(sql`SELECT COUNT(*) c FROM business_submissions WHERE status IN ('pending','under_review')`),
-    listingViews: one(sql`SELECT COUNT(*) c FROM analytics_events WHERE type = 'listing_viewed'`),
-    phoneClicks: one(sql`SELECT COUNT(*) c FROM analytics_events WHERE type = 'phone_clicked'`),
-    whatsappClicks: one(sql`SELECT COUNT(*) c FROM analytics_events WHERE type = 'whatsapp_clicked'`),
-    leadsSubmitted: one(sql`SELECT COUNT(*) c FROM analytics_events WHERE type = 'lead_submitted'`),
+    newLeads: await one(sql`SELECT COUNT(*)::int c FROM leads WHERE status = 'new'`),
+    pendingClaims: await one(
+      sql`SELECT COUNT(*)::int c FROM claim_requests WHERE status IN ('pending','under_review')`
+    ),
+    pendingSubmissions: await one(
+      sql`SELECT COUNT(*)::int c FROM business_submissions WHERE status IN ('pending','under_review')`
+    ),
+    listingViews: await one(
+      sql`SELECT COUNT(*)::int c FROM analytics_events WHERE type = 'listing_viewed'`
+    ),
+    phoneClicks: await one(
+      sql`SELECT COUNT(*)::int c FROM analytics_events WHERE type = 'phone_clicked'`
+    ),
+    whatsappClicks: await one(
+      sql`SELECT COUNT(*)::int c FROM analytics_events WHERE type = 'whatsapp_clicked'`
+    ),
+    leadsSubmitted: await one(
+      sql`SELECT COUNT(*)::int c FROM analytics_events WHERE type = 'lead_submitted'`
+    ),
   };
 }
 
@@ -56,17 +72,20 @@ export interface AdminListingRow extends Listing {
   viewCount: number;
 }
 
-export function getAdminListings(filter?: { status?: string; q?: string }): AdminListingRow[] {
+export async function getAdminListings(filter?: {
+  status?: string;
+  q?: string;
+}): Promise<AdminListingRow[]> {
   const conds = [sql`1=1`];
   if (filter?.status) conds.push(sql`l.status = ${filter.status}`);
   if (filter?.q) {
     const like = `%${filter.q}%`;
-    conds.push(sql`(l.name LIKE ${like} OR l.slug LIKE ${like} OR l.business_name LIKE ${like})`);
+    conds.push(sql`(l.name ILIKE ${like} OR l.slug ILIKE ${like} OR l.business_name ILIKE ${like})`);
   }
-  const rows = db.all<Record<string, unknown>>(sql`
-    SELECT l.*, c.name AS categoryName, loc.name AS locationName,
-      (SELECT COUNT(*) FROM leads ld WHERE ld.listing_id = l.id) AS leadCount,
-      (SELECT COUNT(*) FROM analytics_events ae WHERE ae.listing_id = l.id AND ae.type = 'listing_viewed') AS viewCount
+  const rows = await dbAll<Record<string, unknown>>(sql`
+    SELECT l.*, c.name AS "categoryName", loc.name AS "locationName",
+      (SELECT COUNT(*)::int FROM leads ld WHERE ld.listing_id = l.id) AS "leadCount",
+      (SELECT COUNT(*)::int FROM analytics_events ae WHERE ae.listing_id = l.id AND ae.type = 'listing_viewed') AS "viewCount"
     FROM listings l
     LEFT JOIN categories c ON c.id = l.primary_category_id
     LEFT JOIN locations loc ON loc.id = l.base_location_id
@@ -111,7 +130,7 @@ export function mapListingRow(r: Record<string, unknown>): Listing {
     facebook: r.facebook,
     coverImage: r.cover_image,
     videoUrl: r.video_url,
-    servesAtClientLocation: r.serves_at_client_location === 1,
+    servesAtClientLocation: r.serves_at_client_location === true,
     seoTitle: r.seo_title,
     seoDescription: r.seo_description,
     canonicalOverride: r.canonical_override,
@@ -121,34 +140,43 @@ export function mapListingRow(r: Record<string, unknown>): Listing {
     publishedAt: r.published_at,
     dataSource: r.data_source,
     internalNote: r.internal_note,
-    isDemo: r.is_demo === 1,
+    isDemo: r.is_demo === true,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   } as Listing;
 }
 
-export function getAdminListingById(id: number): (Listing & {
-  categoryIds: number[];
-  occasionIds: number[];
-  serviceAreaIds: number[];
-}) | null {
-  const listing = db.select().from(listings).where(eq(listings.id, id)).get();
+export async function getAdminListingById(id: number): Promise<
+  | (Listing & {
+      categoryIds: number[];
+      occasionIds: number[];
+      serviceAreaIds: number[];
+    })
+  | null
+> {
+  const listing = (await db.select().from(listings).where(eq(listings.id, id)).limit(1))[0];
   if (!listing) return null;
-  const categoryIds = db
-    .all<{ category_id: number }>(sql`SELECT category_id FROM listing_categories WHERE listing_id = ${id}`)
-    .map((r) => r.category_id);
-  const occasionIds = db
-    .all<{ occasion_id: number }>(sql`SELECT occasion_id FROM listing_occasions WHERE listing_id = ${id}`)
-    .map((r) => r.occasion_id);
-  const serviceAreaIds = db
-    .all<{ location_id: number }>(sql`SELECT location_id FROM service_areas WHERE listing_id = ${id}`)
-    .map((r) => r.location_id);
+  const categoryIds = (
+    await dbAll<{ category_id: number }>(
+      sql`SELECT category_id FROM listing_categories WHERE listing_id = ${id}`
+    )
+  ).map((r) => r.category_id);
+  const occasionIds = (
+    await dbAll<{ occasion_id: number }>(
+      sql`SELECT occasion_id FROM listing_occasions WHERE listing_id = ${id}`
+    )
+  ).map((r) => r.occasion_id);
+  const serviceAreaIds = (
+    await dbAll<{ location_id: number }>(
+      sql`SELECT location_id FROM service_areas WHERE listing_id = ${id}`
+    )
+  ).map((r) => r.location_id);
   return { ...listing, categoryIds, occasionIds, serviceAreaIds };
 }
 
-export function getAdminLeads(): (Lead & { listingName: string | null })[] {
-  const rows = db.all<Record<string, unknown>>(sql`
-    SELECT ld.*, l.name AS listingName FROM leads ld
+export async function getAdminLeads(): Promise<(Lead & { listingName: string | null })[]> {
+  const rows = await dbAll<Record<string, unknown>>(sql`
+    SELECT ld.*, l.name AS "listingName" FROM leads ld
     LEFT JOIN listings l ON l.id = ld.listing_id
     ORDER BY ld.created_at DESC
   `);
@@ -168,9 +196,11 @@ export function getAdminLeads(): (Lead & { listingName: string | null })[] {
   })) as (Lead & { listingName: string | null })[];
 }
 
-export function getAdminClaims(): (ClaimRequest & { listingName: string | null; listingSlug: string | null })[] {
-  const rows = db.all<Record<string, unknown>>(sql`
-    SELECT cr.*, l.name AS listingName, l.slug AS listingSlug FROM claim_requests cr
+export async function getAdminClaims(): Promise<
+  (ClaimRequest & { listingName: string | null; listingSlug: string | null })[]
+> {
+  const rows = await dbAll<Record<string, unknown>>(sql`
+    SELECT cr.*, l.name AS "listingName", l.slug AS "listingSlug" FROM claim_requests cr
     LEFT JOIN listings l ON l.id = cr.listing_id
     ORDER BY cr.created_at DESC
   `);
@@ -192,35 +222,35 @@ export function getAdminClaims(): (ClaimRequest & { listingName: string | null; 
   })) as (ClaimRequest & { listingName: string | null; listingSlug: string | null })[];
 }
 
-export function getAdminSubmissions(): BusinessSubmission[] {
-  return db.select().from(businessSubmissions).orderBy(desc(businessSubmissions.createdAt)).all();
+export async function getAdminSubmissions(): Promise<BusinessSubmission[]> {
+  return db.select().from(businessSubmissions).orderBy(desc(businessSubmissions.createdAt));
 }
 
-export function getAllCategoriesFlat() {
-  return db.select().from(categories).orderBy(asc(categories.sortOrder), asc(categories.name)).all();
+export async function getAllCategoriesFlat() {
+  return db.select().from(categories).orderBy(asc(categories.sortOrder), asc(categories.name));
 }
 
-export function getAllLocations() {
-  return db.select().from(locations).orderBy(asc(locations.sortOrder), asc(locations.name)).all();
+export async function getAllLocations() {
+  return db.select().from(locations).orderBy(asc(locations.sortOrder), asc(locations.name));
 }
 
-export function getAllOccasions() {
-  return db.select().from(occasions).orderBy(asc(occasions.sortOrder)).all();
+export async function getAllOccasions() {
+  return db.select().from(occasions).orderBy(asc(occasions.sortOrder));
 }
 
-export function getAllPosts() {
-  return db.select().from(blogPosts).orderBy(desc(blogPosts.updatedAt)).all();
+export async function getAllPosts() {
+  return db.select().from(blogPosts).orderBy(desc(blogPosts.updatedAt));
 }
 
 /** Kandidati za duplikate prema nazivu/telefonu/e-mailu/webu/Instagramu. */
-export function findDuplicateCandidates(input: {
+export async function findDuplicateCandidates(input: {
   name?: string;
   phone?: string;
   email?: string;
   website?: string;
   instagram?: string;
   excludeId?: number;
-}): { id: number; name: string; slug: string; reason: string }[] {
+}): Promise<{ id: number; name: string; slug: string; reason: string }[]> {
   const results: { id: number; name: string; slug: string; reason: string }[] = [];
   const seen = new Set<number>();
   const push = (rows: { id: number; name: string; slug: string }[], reason: string) => {
@@ -232,36 +262,42 @@ export function findDuplicateCandidates(input: {
   };
   if (input.name && input.name.length > 3) {
     push(
-      db.all(sql`SELECT id, name, slug FROM listings WHERE name LIKE ${`%${input.name}%`} LIMIT 5`),
+      await dbAll(sql`SELECT id, name, slug FROM listings WHERE name ILIKE ${`%${input.name}%`} LIMIT 5`),
       "sličan naziv"
     );
   }
   const norm = (s: string) => s.replace(/[^\d]/g, "");
   if (input.phone && norm(input.phone).length >= 6) {
     push(
-      db.all(
-        sql`SELECT id, name, slug FROM listings WHERE REPLACE(REPLACE(REPLACE(COALESCE(phone,''),' ',''),'-',''),'/','') LIKE ${`%${norm(input.phone).slice(-8)}%`} LIMIT 5`
+      await dbAll(
+        sql`SELECT id, name, slug FROM listings WHERE REPLACE(REPLACE(REPLACE(COALESCE(phone,''),' ',''),'-',''),'/','') ILIKE ${`%${norm(input.phone).slice(-8)}%`} LIMIT 5`
       ),
       "isti telefon"
     );
   }
   if (input.email) {
-    push(db.all(sql`SELECT id, name, slug FROM listings WHERE email = ${input.email} LIMIT 5`), "isti e-mail");
+    push(
+      await dbAll(sql`SELECT id, name, slug FROM listings WHERE email = ${input.email} LIMIT 5`),
+      "isti e-mail"
+    );
   }
   if (input.website) {
     const domain = input.website.replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
     if (domain) {
       push(
-        db.all(sql`SELECT id, name, slug FROM listings WHERE website LIKE ${`%${domain}%`} LIMIT 5`),
+        await dbAll(sql`SELECT id, name, slug FROM listings WHERE website ILIKE ${`%${domain}%`} LIMIT 5`),
         "ista domena"
       );
     }
   }
   if (input.instagram) {
-    const handle = input.instagram.replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/\/$/, "");
+    const handle = input.instagram
+      .replace(/^@/, "")
+      .replace(/^https?:\/\/(www\.)?instagram\.com\//, "")
+      .replace(/\/$/, "");
     if (handle) {
       push(
-        db.all(sql`SELECT id, name, slug FROM listings WHERE instagram LIKE ${`%${handle}%`} LIMIT 5`),
+        await dbAll(sql`SELECT id, name, slug FROM listings WHERE instagram ILIKE ${`%${handle}%`} LIMIT 5`),
         "isti Instagram"
       );
     }

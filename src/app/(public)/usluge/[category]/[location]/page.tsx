@@ -25,10 +25,9 @@ interface Props {
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { category, location } = await params;
   const sp = await searchParams;
-  const cat = getCategoryBySlug(category);
-  const loc = getLocationBySlug(location);
+  const [cat, loc] = await Promise.all([getCategoryBySlug(category), getLocationBySlug(location)]);
   if (!cat || !loc) return {};
-  const { total } = getListings({ categorySlug: category, locationSlug: location, limit: 1 });
+  const { total } = await getListings({ categorySlug: category, locationSlug: location, limit: 1 });
   const hasFilters = Object.keys(sp).length > 0;
   return {
     title: `${cat.name} ${loc.name} — ponuda i cijene`,
@@ -42,38 +41,48 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 export default async function CategoryLocationPage({ params, searchParams }: Props) {
   const { category, location } = await params;
   const sp = await searchParams;
-  const cat = getCategoryBySlug(category);
-  const loc = getLocationBySlug(location);
+  const [cat, loc] = await Promise.all([getCategoryBySlug(category), getLocationBySlug(location)]);
   if (!cat || !loc) notFound();
 
   const { page, ...filters } = parseBrowseParams(sp);
-  const occasions = getOccasions();
-  const allLocations = getLocationsWithCounts().filter((l) => l.listingCount > 0);
-  const allCategories = getCategoriesWithCounts();
+  const [occasions, allLocationsRaw, allCategories, combo, allPosts] = await Promise.all([
+    getOccasions(),
+    getLocationsWithCounts(),
+    getCategoriesWithCounts(),
+    getListings({ categorySlug: category, locationSlug: location, limit: 60 }),
+    getPublishedPosts(),
+  ]);
+  const allLocations = allLocationsRaw.filter((l) => l.listingCount > 0);
   const categoryIcons = new Map(allCategories.map((c) => [c.slug, c.icon]));
 
-  const { items: allInCombo, total } = getListings({
-    categorySlug: category,
-    locationSlug: location,
-    limit: 60,
-  });
+  const { items: allInCombo, total } = combo;
   const cheapest = allInCombo
     .map((l) => l.priceFrom)
     .filter((p): p is number => p != null)
     .sort((a, b) => a - b)[0];
 
   // Obližnje lokacije s ponudom u ovoj kategoriji (za empty state i interne linkove)
-  const nearbyWithOffer = allLocations
-    .filter((l) => l.slug !== location)
-    .filter((l) => getListings({ categorySlug: category, locationSlug: l.slug, limit: 1 }).total > 0)
-    .slice(0, 8);
+  const nearbyTotals = await Promise.all(
+    allLocations
+      .filter((l) => l.slug !== location)
+      .map(async (l) => ({
+        l,
+        total: (await getListings({ categorySlug: category, locationSlug: l.slug, limit: 1 })).total,
+      }))
+  );
+  const nearbyWithOffer = nearbyTotals.filter((x) => x.total > 0).map((x) => x.l).slice(0, 8);
 
-  const relatedCategories = allCategories
-    .filter((c) => c.slug !== category)
-    .filter((c) => getListings({ categorySlug: c.slug, locationSlug: location, limit: 1 }).total > 0)
-    .slice(0, 6);
+  const relatedCatTotals = await Promise.all(
+    allCategories
+      .filter((c) => c.slug !== category)
+      .map(async (c) => ({
+        c,
+        total: (await getListings({ categorySlug: c.slug, locationSlug: location, limit: 1 })).total,
+      }))
+  );
+  const relatedCategories = relatedCatTotals.filter((x) => x.total > 0).map((x) => x.c).slice(0, 6);
 
-  const posts = getPublishedPosts().filter((p) => {
+  const posts = allPosts.filter((p) => {
     try {
       return (JSON.parse(p.relatedCategorySlugs ?? "[]") as string[]).includes(category);
     } catch {

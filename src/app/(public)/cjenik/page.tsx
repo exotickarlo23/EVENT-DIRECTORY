@@ -15,8 +15,8 @@ export const metadata: Metadata = {
   alternates: { canonical: absoluteUrl("/cjenik") },
 };
 
-export default function CjenikPage() {
-  const plans = getActivePricingPlans();
+export default async function CjenikPage() {
+  const plans = await getActivePricingPlans();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

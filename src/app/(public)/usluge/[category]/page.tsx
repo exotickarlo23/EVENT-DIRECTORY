@@ -23,9 +23,9 @@ interface Props {
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { category } = await params;
   const sp = await searchParams;
-  const cat = getCategoryBySlug(category);
+  const cat = await getCategoryBySlug(category);
   if (!cat) return {};
-  const { total } = getListings({ categorySlug: category, limit: 1 });
+  const { total } = await getListings({ categorySlug: category, limit: 1 });
   const hasFilters = Object.keys(sp).length > 0;
   return {
     title: `${cat.name} — ponuda i cijene u Hrvatskoj`,
@@ -38,15 +38,19 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
 export default async function CategoryPage({ params, searchParams }: Props) {
   const { category } = await params;
   const sp = await searchParams;
-  const cat = getCategoryBySlug(category);
+  const cat = await getCategoryBySlug(category);
   if (!cat) notFound();
 
   const { page, ...filters } = parseBrowseParams(sp);
-  const locations = getLocationsWithCounts().filter((l) => l.listingCount > 0);
-  const occasions = getOccasions();
-  const allCategories = getCategoriesWithCounts();
+  const [locationsAll, occasions, allCategories, allPosts] = await Promise.all([
+    getLocationsWithCounts(),
+    getOccasions(),
+    getCategoriesWithCounts(),
+    getPublishedPosts(),
+  ]);
+  const locations = locationsAll.filter((l) => l.listingCount > 0);
   const categoryIcons = new Map(allCategories.map((c) => [c.slug, c.icon]));
-  const posts = getPublishedPosts().filter((p) => {
+  const posts = allPosts.filter((p) => {
     try {
       const related = JSON.parse(p.relatedCategorySlugs ?? "[]") as string[];
       return related.includes(category) || related.includes(cat.parent?.slug ?? "");
@@ -56,9 +60,13 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   });
 
   // Lokacije s oglasima u ovoj kategoriji (za interne linkove na category×location stranice)
-  const locationsInCategory = locations.filter(
-    (loc) => getListings({ categorySlug: category, locationSlug: loc.slug, limit: 1 }).total > 0
+  const locationTotals = await Promise.all(
+    locations.map(async (loc) => ({
+      loc,
+      total: (await getListings({ categorySlug: category, locationSlug: loc.slug, limit: 1 })).total,
+    }))
   );
+  const locationsInCategory = locationTotals.filter((x) => x.total > 0).map((x) => x.loc);
   const related = allCategories.filter((c) => c.slug !== category && c.slug !== cat.parent?.slug).slice(0, 6);
 
   const crumbs = cat.parent

@@ -13,8 +13,8 @@ export const metadata: Metadata = {
   alternates: { canonical: absoluteUrl("/lokacije") },
 };
 
-export default function LokacijePage() {
-  const locations = getLocationsWithCounts();
+export default async function LokacijePage() {
+  const locations = await getLocationsWithCounts();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

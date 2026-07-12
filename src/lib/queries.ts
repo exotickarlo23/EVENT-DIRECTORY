@@ -1,12 +1,13 @@
 import "server-only";
-import { sql, type SQL } from "drizzle-orm";
-import { db } from "@/lib/db/client";
+import { sql, type SQL, asc, eq, and } from "drizzle-orm";
+import { db, dbAll, dbGet } from "@/lib/db/client";
 import {
   categories,
   occasions,
   locations,
   blogCategories,
   pricingPlans,
+  listings,
   type Category,
   type Occasion,
   type Location,
@@ -19,7 +20,6 @@ import {
   type ListingTier,
   type ClaimStatus,
 } from "@/lib/db/schema";
-import { asc, eq } from "drizzle-orm";
 
 /** Podaci potrebni za karticu oglasa. */
 export interface ListingCard {
@@ -44,12 +44,7 @@ export interface ListingCard {
   reviewCount: number;
 }
 
-export type ListingSort =
-  | "recommended"
-  | "featured"
-  | "newest"
-  | "price_asc"
-  | "rating";
+export type ListingSort = "recommended" | "featured" | "newest" | "price_asc" | "rating";
 
 export interface ListingFilters {
   categorySlug?: string;
@@ -112,8 +107,8 @@ function mapCard(r: RawCardRow): ListingCard {
 
 const FEATURED_ACTIVE_SQL = sql`(
   l.tier = 'featured'
-  AND (l.featured_from IS NULL OR l.featured_from <= datetime('now'))
-  AND (l.featured_until IS NULL OR l.featured_until >= datetime('now'))
+  AND (l.featured_from IS NULL OR l.featured_from::timestamptz <= now())
+  AND (l.featured_until IS NULL OR l.featured_until::timestamptz >= now())
 )`;
 
 function buildWhere(filters: ListingFilters): SQL {
@@ -147,14 +142,14 @@ function buildWhere(filters: ListingFilters): SQL {
   if (filters.query) {
     const like = `%${filters.query.trim()}%`;
     conditions.push(sql`(
-      l.name LIKE ${like}
-      OR l.short_description LIKE ${like}
-      OR l.description LIKE ${like}
-      OR l.business_name LIKE ${like}
+      l.name ILIKE ${like}
+      OR l.short_description ILIKE ${like}
+      OR l.description ILIKE ${like}
+      OR l.business_name ILIKE ${like}
       OR l.id IN (
         SELECT lc.listing_id FROM listing_categories lc
         JOIN categories c ON c.id = lc.category_id
-        WHERE c.name LIKE ${like}
+        WHERE c.name ILIKE ${like}
       )
     )`);
   }
@@ -165,7 +160,7 @@ function buildWhere(filters: ListingFilters): SQL {
     conditions.push(FEATURED_ACTIVE_SQL);
   }
   if (filters.atClientLocation) {
-    conditions.push(sql`l.serves_at_client_location = 1`);
+    conditions.push(sql`l.serves_at_client_location = true`);
   }
   return sql.join(conditions, sql` AND `);
 }
@@ -175,14 +170,13 @@ function orderBy(sort: ListingSort): SQL {
     case "newest":
       return sql`featured_active DESC, l.published_at DESC`;
     case "price_asc":
-      return sql`l.price_from IS NULL, l.price_from ASC`;
+      return sql`(l.price_from IS NULL), l.price_from ASC`;
     case "rating":
-      return sql`avg_rating IS NULL, avg_rating DESC, review_count DESC`;
+      return sql`(avg_rating IS NULL), avg_rating DESC, review_count DESC`;
     case "featured":
       return sql`featured_active DESC, l.featured_weight DESC, l.published_at DESC`;
     case "recommended":
     default:
-      // 1. aktivni istaknuti (po težini), 2. potpunost profila, 3. novije objave
       return sql`featured_active DESC, l.featured_weight DESC, completeness DESC, l.published_at DESC`;
   }
 }
@@ -191,67 +185,67 @@ const CARD_SELECT = sql`
   SELECT
     l.id, l.slug, l.name, l.short_description, l.cover_image,
     l.price_model, l.price_from, l.price_to, l.tier, l.claim_status,
-    l.serves_at_client_location, l.is_demo,
-    ${FEATURED_ACTIVE_SQL} AS featured_active,
+    l.serves_at_client_location::int AS serves_at_client_location,
+    l.is_demo::int AS is_demo,
+    (${FEATURED_ACTIVE_SQL})::int AS featured_active,
     (
-      (l.cover_image IS NOT NULL)
-      + (l.price_from IS NOT NULL)
-      + (l.phone IS NOT NULL)
-      + (LENGTH(l.description) > 200)
+      (l.cover_image IS NOT NULL)::int
+      + (l.price_from IS NOT NULL)::int
+      + (l.phone IS NOT NULL)::int
+      + (length(l.description) > 200)::int
     ) AS completeness,
     c.name AS category_name, c.slug AS category_slug,
     loc.name AS location_name, loc.slug AS location_slug,
-    (SELECT AVG(r.rating) FROM reviews r WHERE r.listing_id = l.id AND r.status = 'approved') AS avg_rating,
-    (SELECT COUNT(*) FROM reviews r WHERE r.listing_id = l.id AND r.status = 'approved') AS review_count
+    (SELECT AVG(r.rating)::float FROM reviews r WHERE r.listing_id = l.id AND r.status = 'approved') AS avg_rating,
+    (SELECT COUNT(*)::int FROM reviews r WHERE r.listing_id = l.id AND r.status = 'approved') AS review_count
   FROM listings l
   LEFT JOIN categories c ON c.id = l.primary_category_id
   LEFT JOIN locations loc ON loc.id = l.base_location_id
 `;
 
-export function getListings(filters: ListingFilters = {}): {
+export async function getListings(filters: ListingFilters = {}): Promise<{
   items: ListingCard[];
   total: number;
-} {
+}> {
   const where = buildWhere(filters);
   const limit = Math.min(filters.limit ?? 24, 60);
   const offset = filters.offset ?? 0;
 
-  const rows = db.all<RawCardRow>(
+  const rows = await dbAll<RawCardRow>(
     sql`${CARD_SELECT} WHERE ${where} ORDER BY ${orderBy(filters.sort ?? "recommended")} LIMIT ${limit} OFFSET ${offset}`
   );
-  const totalRow = db.get<{ total: number }>(
-    sql`SELECT COUNT(*) AS total FROM listings l WHERE ${where}`
+  const totalRow = await dbGet<{ total: number }>(
+    sql`SELECT COUNT(*)::int AS total FROM listings l WHERE ${where}`
   );
   return { items: rows.map(mapCard), total: totalRow?.total ?? 0 };
 }
 
-export function getFeaturedListings(limit = 8): ListingCard[] {
-  return getListings({ featuredOnly: true, sort: "featured", limit }).items;
+export async function getFeaturedListings(limit = 8): Promise<ListingCard[]> {
+  return (await getListings({ featuredOnly: true, sort: "featured", limit })).items;
 }
 
 /** Kategorije prve razine s brojem objavljenih oglasa. */
 export interface CategoryWithCount extends Category {
   listingCount: number;
-  children: Category[];
+  children: (Category & { listingCount: number })[];
 }
 
-export function getCategoriesWithCounts(): CategoryWithCount[] {
-  const all = db.select().from(categories).orderBy(asc(categories.sortOrder), asc(categories.name)).all();
+export async function getCategoriesWithCounts(): Promise<CategoryWithCount[]> {
+  const all = await db
+    .select()
+    .from(categories)
+    .orderBy(asc(categories.sortOrder), asc(categories.name));
 
-  // Broj DISTINCT objavljenih oglasa po pojedinoj (pod)kategoriji.
-  const perCategory = db.all<{ category_id: number; cnt: number }>(sql`
-    SELECT lc.category_id, COUNT(DISTINCT lc.listing_id) AS cnt
+  const perCategory = await dbAll<{ category_id: number; cnt: number }>(sql`
+    SELECT lc.category_id, COUNT(DISTINCT lc.listing_id)::int AS cnt
     FROM listing_categories lc
     JOIN listings l ON l.id = lc.listing_id AND l.status = 'published'
     GROUP BY lc.category_id
   `);
   const perCategoryMap = new Map(perCategory.map((c) => [c.category_id, c.cnt]));
 
-  // Za top-level kategoriju broj oglasa je DISTINCT skup oglasa u njoj ILI bilo
-  // kojoj njezinoj podkategoriji (isti oglas se ne broji dvaput). Poklapa se s
-  // brojem na stranici kategorije (/usluge/[slug]).
-  const perTopLevel = db.all<{ top_id: number; cnt: number }>(sql`
-    SELECT top.id AS top_id, COUNT(DISTINCT lc.listing_id) AS cnt
+  const perTopLevel = await dbAll<{ top_id: number; cnt: number }>(sql`
+    SELECT top.id AS top_id, COUNT(DISTINCT lc.listing_id)::int AS cnt
     FROM categories top
     JOIN categories c ON c.id = top.id OR c.parent_id = top.id
     JOIN listing_categories lc ON lc.category_id = c.id
@@ -270,32 +264,37 @@ export function getCategoriesWithCounts(): CategoryWithCount[] {
   });
 }
 
-export function getCategoryBySlug(slug: string): (Category & { parent: Category | null; children: Category[] }) | null {
-  const cat = db.select().from(categories).where(eq(categories.slug, slug)).get();
+export async function getCategoryBySlug(
+  slug: string
+): Promise<(Category & { parent: Category | null; children: Category[] }) | null> {
+  const cat = (await db.select().from(categories).where(eq(categories.slug, slug)).limit(1))[0];
   if (!cat) return null;
   const parent = cat.parentId
-    ? db.select().from(categories).where(eq(categories.id, cat.parentId)).get() ?? null
+    ? (await db.select().from(categories).where(eq(categories.id, cat.parentId)).limit(1))[0] ?? null
     : null;
-  const children = db.select().from(categories).where(eq(categories.parentId, cat.id)).all();
+  const children = await db.select().from(categories).where(eq(categories.parentId, cat.id));
   return { ...cat, parent, children };
 }
 
-export function getOccasions(): Occasion[] {
-  return db.select().from(occasions).orderBy(asc(occasions.sortOrder), asc(occasions.name)).all();
+export async function getOccasions(): Promise<Occasion[]> {
+  return db.select().from(occasions).orderBy(asc(occasions.sortOrder), asc(occasions.name));
 }
 
-export function getOccasionBySlug(slug: string): Occasion | null {
-  return db.select().from(occasions).where(eq(occasions.slug, slug)).get() ?? null;
+export async function getOccasionBySlug(slug: string): Promise<Occasion | null> {
+  return (await db.select().from(occasions).where(eq(occasions.slug, slug)).limit(1))[0] ?? null;
 }
 
 export interface LocationWithCount extends Location {
   listingCount: number;
 }
 
-export function getLocationsWithCounts(): LocationWithCount[] {
-  const all = db.select().from(locations).orderBy(asc(locations.sortOrder), asc(locations.name)).all();
-  const counts = db.all<{ location_id: number; cnt: number }>(sql`
-    SELECT loc.id AS location_id, COUNT(DISTINCT l.id) AS cnt
+export async function getLocationsWithCounts(): Promise<LocationWithCount[]> {
+  const all = await db
+    .select()
+    .from(locations)
+    .orderBy(asc(locations.sortOrder), asc(locations.name));
+  const counts = await dbAll<{ location_id: number; cnt: number }>(sql`
+    SELECT loc.id AS location_id, COUNT(DISTINCT l.id)::int AS cnt
     FROM locations loc
     JOIN listings l ON l.status = 'published' AND (
       l.base_location_id = loc.id
@@ -307,8 +306,8 @@ export function getLocationsWithCounts(): LocationWithCount[] {
   return all.map((l) => ({ ...l, listingCount: countMap.get(l.id) ?? 0 }));
 }
 
-export function getLocationBySlug(slug: string): Location | null {
-  return db.select().from(locations).where(eq(locations.slug, slug)).get() ?? null;
+export async function getLocationBySlug(slug: string): Promise<Location | null> {
+  return (await db.select().from(locations).where(eq(locations.slug, slug)).limit(1))[0] ?? null;
 }
 
 /** Puni detalj oglasa za javnu stranicu. */
@@ -325,90 +324,49 @@ export interface ListingDetail extends Listing {
   reviewCount: number;
 }
 
-export function getListingBySlug(slug: string, { publicOnly = true } = {}): ListingDetail | null {
-  const row = db.all<Listing & Record<string, unknown>>(sql`
-    SELECT * FROM listings WHERE slug = ${slug} ${publicOnly ? sql`AND status = 'published'` : sql``} LIMIT 1
-  `)[0];
+export async function getListingBySlug(
+  slug: string,
+  { publicOnly = true } = {}
+): Promise<ListingDetail | null> {
+  const where = publicOnly
+    ? and(eq(listings.slug, slug), eq(listings.status, "published"))
+    : eq(listings.slug, slug);
+  const row = (await db.select().from(listings).where(where).limit(1))[0];
   if (!row) return null;
-  return hydrateListing(rowToListing(row));
+  return hydrateListing(row);
 }
 
-function rowToListing(r: Record<string, unknown>): Listing {
-  return {
-    id: r.id,
-    slug: r.slug,
-    status: r.status,
-    tier: r.tier,
-    claimStatus: r.claim_status,
-    providerId: r.provider_id,
-    name: r.name,
-    businessName: r.business_name,
-    shortDescription: r.short_description,
-    description: r.description,
-    primaryCategoryId: r.primary_category_id,
-    baseLocationId: r.base_location_id,
-    address: r.address,
-    lat: r.lat,
-    lng: r.lng,
-    priceFrom: r.price_from,
-    priceTo: r.price_to,
-    priceModel: r.price_model,
-    currency: r.currency,
-    phone: r.phone,
-    whatsapp: r.whatsapp,
-    email: r.email,
-    website: r.website,
-    instagram: r.instagram,
-    facebook: r.facebook,
-    coverImage: r.cover_image,
-    videoUrl: r.video_url,
-    servesAtClientLocation: r.serves_at_client_location === 1,
-    seoTitle: r.seo_title,
-    seoDescription: r.seo_description,
-    canonicalOverride: r.canonical_override,
-    featuredWeight: r.featured_weight,
-    featuredFrom: r.featured_from,
-    featuredUntil: r.featured_until,
-    publishedAt: r.published_at,
-    dataSource: r.data_source,
-    internalNote: r.internal_note,
-    isDemo: r.is_demo === 1,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  } as Listing;
-}
-
-function hydrateListing(listing: Listing): ListingDetail {
+async function hydrateListing(listing: Listing): Promise<ListingDetail> {
   const category = listing.primaryCategoryId
-    ? db.select().from(categories).where(eq(categories.id, listing.primaryCategoryId)).get() ?? null
+    ? (await db.select().from(categories).where(eq(categories.id, listing.primaryCategoryId)).limit(1))[0] ?? null
     : null;
-  const categoriesAll = db.all<Category>(sql`
+  const categoriesAll = await dbAll<Category>(sql`
     SELECT c.* FROM categories c JOIN listing_categories lc ON lc.category_id = c.id
     WHERE lc.listing_id = ${listing.id} ORDER BY c.sort_order
   `);
   const baseLocation = listing.baseLocationId
-    ? db.select().from(locations).where(eq(locations.id, listing.baseLocationId)).get() ?? null
+    ? (await db.select().from(locations).where(eq(locations.id, listing.baseLocationId)).limit(1))[0] ?? null
     : null;
-  const serviceAreaLocations = db.all<Location>(sql`
+  const serviceAreaLocations = await dbAll<Location>(sql`
     SELECT loc.* FROM locations loc JOIN service_areas sa ON sa.location_id = loc.id
     WHERE sa.listing_id = ${listing.id} ORDER BY loc.sort_order
   `);
-  const occasionsAll = db.all<Occasion>(sql`
+  const occasionsAll = await dbAll<Occasion>(sql`
     SELECT o.* FROM occasions o JOIN listing_occasions lo ON lo.occasion_id = o.id
     WHERE lo.listing_id = ${listing.id} ORDER BY o.sort_order
   `);
-  const mediaItems = db.all<MediaItem>(sql`
-    SELECT id, listing_id AS listingId, url, alt, kind, sort_order AS sortOrder
+  const mediaItems = await dbAll<MediaItem>(sql`
+    SELECT id, listing_id AS "listingId", url, alt, kind, sort_order AS "sortOrder"
     FROM media WHERE listing_id = ${listing.id} ORDER BY sort_order
   `);
-  const pkgs = db.all<Package>(sql`
-    SELECT id, listing_id AS listingId, name, description, price_from AS priceFrom,
-      price_to AS priceTo, includes, sort_order AS sortOrder
+  const pkgs = await dbAll<Package>(sql`
+    SELECT id, listing_id AS "listingId", name, description, price_from AS "priceFrom",
+      price_to AS "priceTo", includes, sort_order AS "sortOrder"
     FROM packages WHERE listing_id = ${listing.id} ORDER BY sort_order
   `);
-  const approvedReviews = db.all<Review>(sql`
-    SELECT id, listing_id AS listingId, rating, text, author_name AS authorName,
-      event_date AS eventDate, status, is_demo AS isDemo, created_at AS createdAt
+  const approvedReviews = await dbAll<Review>(sql`
+    SELECT id, listing_id AS "listingId", rating, text, author_name AS "authorName",
+      event_date AS "eventDate", status, is_demo AS "isDemo", created_at AS "createdAt"
     FROM reviews WHERE listing_id = ${listing.id} AND status = 'approved'
     ORDER BY created_at DESC
   `);
@@ -431,8 +389,8 @@ function hydrateListing(listing: Listing): ListingDetail {
   };
 }
 
-export function getRelatedListings(listing: ListingDetail, limit = 4): ListingCard[] {
-  const rows = db.all<RawCardRow>(sql`
+export async function getRelatedListings(listing: ListingDetail, limit = 4): Promise<ListingCard[]> {
+  const rows = await dbAll<RawCardRow>(sql`
     ${CARD_SELECT}
     WHERE l.status = 'published' AND l.id != ${listing.id}
       AND (
@@ -451,10 +409,13 @@ export function getRelatedListings(listing: ListingDetail, limit = 4): ListingCa
   return rows.map(mapCard);
 }
 
-export function getListingCardsByIds(ids: number[]): ListingCard[] {
+export async function getListingCardsByIds(ids: number[]): Promise<ListingCard[]> {
   if (ids.length === 0) return [];
-  const idList = sql.join(ids.map((id) => sql`${id}`), sql`, `);
-  const rows = db.all<RawCardRow>(
+  const idList = sql.join(
+    ids.map((id) => sql`${id}`),
+    sql`, `
+  );
+  const rows = await dbAll<RawCardRow>(
     sql`${CARD_SELECT} WHERE l.status = 'published' AND l.id IN (${idList})`
   );
   const order = new Map(ids.map((id, i) => [id, i]));
@@ -463,8 +424,10 @@ export function getListingCardsByIds(ids: number[]): ListingCard[] {
 
 // ---------- Blog ----------
 
-export function getPublishedPosts(limit?: number): (BlogPost & { categoryName: string | null })[] {
-  const rows = db.all<Record<string, unknown>>(sql`
+export async function getPublishedPosts(
+  limit?: number
+): Promise<(BlogPost & { categoryName: string | null })[]> {
+  const rows = await dbAll<Record<string, unknown>>(sql`
     SELECT bp.*, bc.name AS category_name
     FROM blog_posts bp LEFT JOIN blog_categories bc ON bc.id = bp.category_id
     WHERE bp.status = 'published'
@@ -494,37 +457,38 @@ function mapPost(r: Record<string, unknown>): BlogPost {
   } as BlogPost;
 }
 
-export function getPostBySlug(slug: string): (BlogPost & { categoryName: string | null }) | null {
-  const r = db.all<Record<string, unknown>>(sql`
-    SELECT bp.*, bc.name AS category_name
-    FROM blog_posts bp LEFT JOIN blog_categories bc ON bc.id = bp.category_id
-    WHERE bp.slug = ${slug} AND bp.status = 'published' LIMIT 1
-  `)[0];
+export async function getPostBySlug(
+  slug: string
+): Promise<(BlogPost & { categoryName: string | null }) | null> {
+  const r = (
+    await dbAll<Record<string, unknown>>(sql`
+      SELECT bp.*, bc.name AS category_name
+      FROM blog_posts bp LEFT JOIN blog_categories bc ON bc.id = bp.category_id
+      WHERE bp.slug = ${slug} AND bp.status = 'published' LIMIT 1
+    `)
+  )[0];
   if (!r) return null;
   return { ...mapPost(r), categoryName: (r.category_name as string) ?? null };
 }
 
-export function getBlogCategories() {
-  return db.select().from(blogCategories).orderBy(asc(blogCategories.sortOrder)).all();
+export async function getBlogCategories() {
+  return db.select().from(blogCategories).orderBy(asc(blogCategories.sortOrder));
 }
 
-export function getActivePricingPlans() {
+export async function getActivePricingPlans() {
   return db
     .select()
     .from(pricingPlans)
     .where(eq(pricingPlans.active, true))
-    .orderBy(asc(pricingPlans.sortOrder))
-    .all();
+    .orderBy(asc(pricingPlans.sortOrder));
 }
 
 /** Kombinacije kategorija × lokacija koje imaju barem jedan oglas (za sitemap + SEO). */
-export function getIndexableCategoryLocationPairs(): {
-  categorySlug: string;
-  locationSlug: string;
-  count: number;
-}[] {
-  return db.all<{ categorySlug: string; locationSlug: string; count: number }>(sql`
-    SELECT c.slug AS categorySlug, loc.slug AS locationSlug, COUNT(DISTINCT l.id) AS count
+export async function getIndexableCategoryLocationPairs(): Promise<
+  { categorySlug: string; locationSlug: string; count: number }[]
+> {
+  return dbAll<{ categorySlug: string; locationSlug: string; count: number }>(sql`
+    SELECT c.slug AS "categorySlug", loc.slug AS "locationSlug", COUNT(DISTINCT l.id)::int AS count
     FROM listings l
     JOIN listing_categories lc ON lc.listing_id = l.id
     JOIN categories c ON c.id = lc.category_id AND c.parent_id IS NULL
@@ -534,25 +498,22 @@ export function getIndexableCategoryLocationPairs(): {
     )
     WHERE l.status = 'published'
     GROUP BY c.slug, loc.slug
-    HAVING count >= 1
+    HAVING COUNT(DISTINCT l.id) >= 1
   `);
 }
 
-export function getAllPublishedListingSlugs(): {
-  slug: string;
-  updatedAt: string;
-  categorySlug: string | null;
-  locationSlug: string | null;
-}[] {
-  return db.all<{
+export async function getAllPublishedListingSlugs(): Promise<
+  { slug: string; updatedAt: string; categorySlug: string | null; locationSlug: string | null }[]
+> {
+  return dbAll<{
     slug: string;
     updatedAt: string;
     categorySlug: string | null;
     locationSlug: string | null;
   }>(sql`
-    SELECT l.slug, l.updated_at AS updatedAt,
-      c.slug AS categorySlug,
-      loc.slug AS locationSlug
+    SELECT l.slug, l.updated_at AS "updatedAt",
+      c.slug AS "categorySlug",
+      loc.slug AS "locationSlug"
     FROM listings l
     LEFT JOIN categories c ON c.id = l.primary_category_id
     LEFT JOIN locations loc ON loc.id = l.base_location_id

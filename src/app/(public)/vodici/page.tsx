@@ -12,9 +12,9 @@ export const metadata: Metadata = {
   alternates: { canonical: absoluteUrl("/vodici") },
 };
 
-export default function VodiciPage() {
-  const posts = getPublishedPosts();
-  const categories = getBlogCategories();
+export default async function VodiciPage() {
+  const posts = await getPublishedPosts();
+  const categories = await getBlogCategories();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">

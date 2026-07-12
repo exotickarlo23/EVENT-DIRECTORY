@@ -23,12 +23,15 @@ export const metadata: Metadata = {
   alternates: { canonical: absoluteUrl("/usluge") },
 };
 
-export default function UslugePage() {
-  const categories = getCategoriesWithCounts();
-  const locations = getLocationsWithCounts().filter((l) => l.listingCount > 0);
-  const occasions = getOccasions();
-  const featured = getFeaturedListings(3);
-  const posts = getPublishedPosts(3);
+export default async function UslugePage() {
+  const [categories, locationsAll, occasions, featured, posts] = await Promise.all([
+    getCategoriesWithCounts(),
+    getLocationsWithCounts(),
+    getOccasions(),
+    getFeaturedListings(3),
+    getPublishedPosts(3),
+  ]);
+  const locations = locationsAll.filter((l) => l.listingCount > 0);
   const categoryIcons = new Map(categories.map((c) => [c.slug, c.icon]));
 
   return (

@@ -2,8 +2,8 @@ import { getLocationsWithCounts } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminLokacijePage() {
-  const locations = getLocationsWithCounts();
+export default async function AdminLokacijePage() {
+  const locations = await getLocationsWithCounts();
   return (
     <div className="max-w-3xl">
       <h1 className="mb-2 font-display text-2xl font-bold text-plum md:text-3xl">Lokacije</h1>

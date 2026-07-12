@@ -4,8 +4,8 @@ import { ButtonLink } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminDashboardPage() {
-  const s = getDashboardStats();
+export default async function AdminDashboardPage() {
+  const s = await getDashboardStats();
 
   const cards = [
     { label: "Aktivni oglasi", value: s.totalPublished, href: "/admin/oglasi" },
