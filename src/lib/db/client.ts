@@ -24,7 +24,10 @@ const client =
   globalForDb.__sqlClient ??
   postgres(connectionString, {
     prepare: false, // nužno za Supabase transaction pooler
-    max: process.env.NODE_ENV === "production" ? 1 : 5,
+    // Nekoliko konekcija po instanci: React renderira layout i stranicu
+    // paralelno pa se upiti ne guraju kroz jednu konekciju (izbjegava zastoje
+    // na transaction pooleru). Supavisor podnosi mnogo klijentskih konekcija.
+    max: 5,
     connect_timeout: 15, // brzo javi grešku umjesto da "visi" (build/runtime)
     idle_timeout: 20,
   });

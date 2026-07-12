@@ -1,6 +1,16 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { sql, type SQL, asc, eq, and } from "drizzle-orm";
 import { db, dbAll, dbGet } from "@/lib/db/client";
+
+/**
+ * Globalni taksonomijski podaci (kategorije, lokacije, prigode, vodiči) isti su
+ * za sve posjetitelje i rijetko se mijenjaju. Cacheiramo ih u Next Data Cache pa
+ * ih layout ne dohvaća iz baze na svakom zahtjevu (bez toga svaka stranica gura
+ * 4 upita kroz pooler → zastoji/timeouti pod opterećenjem). Osvježava se svakih
+ * 120 s (dovoljno da se promjene u adminu odraze brzo).
+ */
+const TAXONOMY_REVALIDATE = 120;
 import {
   categories,
   occasions,
@@ -230,7 +240,12 @@ export interface CategoryWithCount extends Category {
   children: (Category & { listingCount: number })[];
 }
 
-export async function getCategoriesWithCounts(): Promise<CategoryWithCount[]> {
+export const getCategoriesWithCounts = unstable_cache(
+  _getCategoriesWithCounts,
+  ["categories-with-counts"],
+  { revalidate: TAXONOMY_REVALIDATE, tags: ["taxonomy"] }
+);
+async function _getCategoriesWithCounts(): Promise<CategoryWithCount[]> {
   const all = await db
     .select()
     .from(categories)
@@ -276,9 +291,12 @@ export async function getCategoryBySlug(
   return { ...cat, parent, children };
 }
 
-export async function getOccasions(): Promise<Occasion[]> {
-  return db.select().from(occasions).orderBy(asc(occasions.sortOrder), asc(occasions.name));
-}
+export const getOccasions = unstable_cache(
+  async (): Promise<Occasion[]> =>
+    db.select().from(occasions).orderBy(asc(occasions.sortOrder), asc(occasions.name)),
+  ["occasions"],
+  { revalidate: TAXONOMY_REVALIDATE, tags: ["taxonomy"] }
+);
 
 export async function getOccasionBySlug(slug: string): Promise<Occasion | null> {
   return (await db.select().from(occasions).where(eq(occasions.slug, slug)).limit(1))[0] ?? null;
@@ -288,7 +306,12 @@ export interface LocationWithCount extends Location {
   listingCount: number;
 }
 
-export async function getLocationsWithCounts(): Promise<LocationWithCount[]> {
+export const getLocationsWithCounts = unstable_cache(
+  _getLocationsWithCounts,
+  ["locations-with-counts"],
+  { revalidate: TAXONOMY_REVALIDATE, tags: ["taxonomy"] }
+);
+async function _getLocationsWithCounts(): Promise<LocationWithCount[]> {
   const all = await db
     .select()
     .from(locations)
@@ -424,7 +447,12 @@ export async function getListingCardsByIds(ids: number[]): Promise<ListingCard[]
 
 // ---------- Blog ----------
 
-export async function getPublishedPosts(
+export const getPublishedPosts = unstable_cache(
+  _getPublishedPosts,
+  ["published-posts"],
+  { revalidate: TAXONOMY_REVALIDATE, tags: ["taxonomy", "posts"] }
+);
+async function _getPublishedPosts(
   limit?: number
 ): Promise<(BlogPost & { categoryName: string | null })[]> {
   const rows = await dbAll<Record<string, unknown>>(sql`
