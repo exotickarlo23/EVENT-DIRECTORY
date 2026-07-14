@@ -55,7 +55,11 @@ export function ImportWizard() {
           </div>
           <div>
             <Label htmlFor="csv-text">…ili zalijepi CSV sadržaj</Label>
-            <Textarea id="csv-text" name="csv_text" className="min-h-32 font-mono text-xs" placeholder={"name,category_slug,location_slug\nMoj biznis,catering-i-hrana,zagreb"} />
+            <Textarea id="csv-text" name="csv_text" className="min-h-32 font-mono text-xs" placeholder={"name,category_slug,location_slug,cover_image,gallery\nMoj biznis,catering-i-hrana,zagreb,https://primjer.hr/cover.jpg,https://primjer.hr/1.jpg|https://primjer.hr/2.jpg"} />
+            <p className="mt-1 text-xs text-muted">
+              Fotografije: <code>cover_image</code> = URL naslovne slike, <code>gallery</code> = više URL-ova odvojenih znakom <code>|</code>.
+              Ako je <code>cover_image</code> prazan, prva slika iz galerije postaje naslovna.
+            </p>
           </div>
         </div>
         {preview && !preview.ok ? (

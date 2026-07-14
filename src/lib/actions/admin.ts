@@ -2,13 +2,14 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import {
   listings,
   listingCategories,
   listingOccasions,
   serviceAreas,
+  media,
   leads,
   claimRequests,
   businessSubmissions,
@@ -194,6 +195,17 @@ export async function saveListing(
     db.insert(serviceAreas).values({ listingId: id, locationId }).run();
   }
 
+  // Galerija fotografija — jedan URL po retku iz textarea polja.
+  // Zamijeni sve postojeće slike (video mediji, ako postoje, ostaju netaknuti).
+  const galleryUrls = String(formData.get("galleryUrls") ?? "")
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  db.delete(media).where(and(eq(media.listingId, id), eq(media.kind, "image"))).run();
+  galleryUrls.forEach((url, i) => {
+    db.insert(media).values({ listingId: id, url, alt: data.name, kind: "image", sortOrder: i }).run();
+  });
+
   const duplicates =
     listingId == null
       ? findDuplicateCandidates({
@@ -226,6 +238,73 @@ export async function setListingStatus(id: number, status: ListingStatus): Promi
   revalidatePath("/admin/oglasi");
 }
 
+export type BulkAction =
+  | "publish"
+  | "pause"
+  | "archive"
+  | "draft"
+  | "feature"
+  | "unfeature"
+  | "delete";
+
+/** Skupna radnja nad više oglasa odjednom (bulk edit u admin popisu). */
+export async function bulkUpdateListings(
+  ids: number[],
+  action: BulkAction
+): Promise<{ affected: number }> {
+  await requireAdmin();
+  const clean = [...new Set(ids)].filter((n) => Number.isInteger(n) && n > 0);
+  if (clean.length === 0) return { affected: 0 };
+  const now = nowIso();
+  let affected = 0;
+
+  for (const id of clean) {
+    const current = db.select().from(listings).where(eq(listings.id, id)).get();
+    if (!current) continue;
+
+    if (action === "delete") {
+      db.delete(listingCategories).where(eq(listingCategories.listingId, id)).run();
+      db.delete(listingOccasions).where(eq(listingOccasions.listingId, id)).run();
+      db.delete(serviceAreas).where(eq(serviceAreas.listingId, id)).run();
+      db.delete(media).where(eq(media.listingId, id)).run();
+      db.delete(listings).where(eq(listings.id, id)).run();
+      affected++;
+      continue;
+    }
+
+    if (action === "feature" || action === "unfeature") {
+      db.update(listings)
+        .set({ tier: action === "feature" ? "featured" : "free", updatedAt: now })
+        .where(eq(listings.id, id))
+        .run();
+      affected++;
+      continue;
+    }
+
+    const status: ListingStatus =
+      action === "publish"
+        ? "published"
+        : action === "pause"
+          ? "paused"
+          : action === "archive"
+            ? "archived"
+            : "draft";
+    db.update(listings)
+      .set({
+        status,
+        publishedAt: status === "published" && !current.publishedAt ? now : current.publishedAt,
+        updatedAt: now,
+      })
+      .where(eq(listings.id, id))
+      .run();
+    affected++;
+  }
+
+  revalidatePublic();
+  revalidatePath("/admin/oglasi");
+  return { affected };
+}
+
 export async function duplicateListing(id: number): Promise<void> {
   await requireAdmin();
   const current = db.select().from(listings).where(eq(listings.id, id)).get();
@@ -256,6 +335,8 @@ export async function duplicateListing(id: number): Promise<void> {
     SELECT ${inserted.id}, occasion_id FROM listing_occasions WHERE listing_id = ${id}`);
   db.run(sql`INSERT INTO service_areas (listing_id, location_id)
     SELECT ${inserted.id}, location_id FROM service_areas WHERE listing_id = ${id}`);
+  db.run(sql`INSERT INTO media (listing_id, url, alt, kind, sort_order)
+    SELECT ${inserted.id}, url, alt, kind, sort_order FROM media WHERE listing_id = ${id}`);
   revalidatePath("/admin/oglasi");
 }
 
@@ -264,6 +345,7 @@ export async function deleteListing(id: number): Promise<void> {
   db.delete(listingCategories).where(eq(listingCategories.listingId, id)).run();
   db.delete(listingOccasions).where(eq(listingOccasions.listingId, id)).run();
   db.delete(serviceAreas).where(eq(serviceAreas.listingId, id)).run();
+  db.delete(media).where(eq(media.listingId, id)).run();
   db.delete(listings).where(eq(listings.id, id)).run();
   revalidatePublic();
   revalidatePath("/admin/oglasi");
@@ -490,6 +572,13 @@ export async function confirmCsvImport(_prev: CsvImportResult | null, formData: 
       : Number.isFinite(priceFrom)
         ? "from"
         : "on_request";
+    // Galerija: "https://a.jpg|https://b.jpg". Ako nema zasebne naslovne,
+    // prva slika iz galerije postaje cover (da se kartica prikaže sa slikom).
+    const galleryUrls = (data.gallery ?? "")
+      .split("|")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const coverImage = (data.cover_image ?? "").trim() || galleryUrls[0] || null;
     const inserted = db
       .insert(listings)
       .values({
@@ -511,6 +600,7 @@ export async function confirmCsvImport(_prev: CsvImportResult | null, formData: 
         website: data.website || null,
         instagram: data.instagram || null,
         facebook: data.facebook || null,
+        coverImage,
         dataSource: data.data_source || "CSV import",
         publishedAt: publish ? now : null,
         createdAt: now,
@@ -528,6 +618,11 @@ export async function confirmCsvImport(_prev: CsvImportResult | null, formData: 
       const loc = db.get<{ id: number }>(sql`SELECT id FROM locations WHERE slug = ${areaSlug}`);
       if (loc) db.insert(serviceAreas).values({ listingId: inserted.id, locationId: loc.id }).run();
     }
+    galleryUrls.forEach((url, gi) => {
+      db.insert(media)
+        .values({ listingId: inserted.id, url, alt: name, kind: "image", sortOrder: gi })
+        .run();
+    });
     imported++;
   }
   revalidatePublic();

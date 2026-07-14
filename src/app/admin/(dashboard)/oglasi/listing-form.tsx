@@ -44,12 +44,14 @@ export function ListingForm({
   locations,
   occasions,
   selected,
+  galleryUrls,
 }: {
   listing: Listing | null;
   categories: Taxonomy[];
   locations: Taxonomy[];
   occasions: Taxonomy[];
   selected?: { categoryIds: number[]; occasionIds: number[]; serviceAreaIds: number[] };
+  galleryUrls?: string[];
 }) {
   const action = saveListing.bind(null, listing?.id ?? null);
   const [state, formAction, pending] = useActionState<ListingSaveResult | null, FormData>(
@@ -275,12 +277,26 @@ export function ListingForm({
           <div>
             <Label htmlFor="f-cover">Naslovna fotografija (URL)</Label>
             <Input id="f-cover" name="coverImage" defaultValue={listing?.coverImage ?? ""} placeholder="/images/... ili https://…" />
-            <p className="mt-1 text-xs text-muted">Prazno = brendirani placeholder. Upload slika stiže u fazi 2.</p>
+            <p className="mt-1 text-xs text-muted">Prazno = brendirani placeholder.</p>
           </div>
           <div>
             <Label htmlFor="f-video">Video URL</Label>
             <Input id="f-video" name="videoUrl" defaultValue={listing?.videoUrl ?? ""} />
           </div>
+        </div>
+        <div>
+          <Label htmlFor="f-gallery">Galerija fotografija (jedan URL po retku)</Label>
+          <Textarea
+            id="f-gallery"
+            name="galleryUrls"
+            className="min-h-28 font-mono text-xs"
+            defaultValue={(galleryUrls ?? []).join("\n")}
+            placeholder={"https://primjer.hr/foto-1.jpg\nhttps://primjer.hr/foto-2.jpg"}
+          />
+          <p className="mt-1 text-xs text-muted">
+            Ovdje slažeš dodatne fotografije (uz naslovnu). Uredi, dodaj ili obriši retke —
+            spremljena lista zamjenjuje prethodnu galeriju.
+          </p>
         </div>
       </Fieldset>
 
