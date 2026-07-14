@@ -7,8 +7,8 @@ import {
   getAllOccasions,
 } from "@/lib/admin-queries";
 import { db } from "@/lib/db/client";
-import { leads } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { leads, media } from "@/lib/db/schema";
+import { eq, and, asc, desc } from "drizzle-orm";
 import { ListingForm } from "../listing-form";
 import { Badge } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
@@ -33,6 +33,14 @@ export default async function UrediOglasPage({ params }: Props) {
     .orderBy(desc(leads.createdAt))
     .all();
 
+  const galleryUrls = db
+    .select({ url: media.url })
+    .from(media)
+    .where(and(eq(media.listingId, listingId), eq(media.kind, "image")))
+    .orderBy(asc(media.sortOrder))
+    .all()
+    .map((m) => m.url);
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center gap-3">
@@ -55,6 +63,7 @@ export default async function UrediOglasPage({ params }: Props) {
           occasionIds: listing.occasionIds,
           serviceAreaIds: listing.serviceAreaIds,
         }}
+        galleryUrls={galleryUrls}
       />
 
       <section className="mt-10 max-w-4xl">

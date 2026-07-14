@@ -62,6 +62,8 @@ export const CSV_COLUMNS = [
   "address",
   "occasions",
   "service_areas",
+  "cover_image",
+  "gallery",
   "data_source",
 ] as const;
 
