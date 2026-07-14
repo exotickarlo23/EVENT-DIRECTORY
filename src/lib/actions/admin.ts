@@ -238,6 +238,73 @@ export async function setListingStatus(id: number, status: ListingStatus): Promi
   revalidatePath("/admin/oglasi");
 }
 
+export type BulkAction =
+  | "publish"
+  | "pause"
+  | "archive"
+  | "draft"
+  | "feature"
+  | "unfeature"
+  | "delete";
+
+/** Skupna radnja nad više oglasa odjednom (bulk edit u admin popisu). */
+export async function bulkUpdateListings(
+  ids: number[],
+  action: BulkAction
+): Promise<{ affected: number }> {
+  await requireAdmin();
+  const clean = [...new Set(ids)].filter((n) => Number.isInteger(n) && n > 0);
+  if (clean.length === 0) return { affected: 0 };
+  const now = nowIso();
+  let affected = 0;
+
+  for (const id of clean) {
+    const current = db.select().from(listings).where(eq(listings.id, id)).get();
+    if (!current) continue;
+
+    if (action === "delete") {
+      db.delete(listingCategories).where(eq(listingCategories.listingId, id)).run();
+      db.delete(listingOccasions).where(eq(listingOccasions.listingId, id)).run();
+      db.delete(serviceAreas).where(eq(serviceAreas.listingId, id)).run();
+      db.delete(media).where(eq(media.listingId, id)).run();
+      db.delete(listings).where(eq(listings.id, id)).run();
+      affected++;
+      continue;
+    }
+
+    if (action === "feature" || action === "unfeature") {
+      db.update(listings)
+        .set({ tier: action === "feature" ? "featured" : "free", updatedAt: now })
+        .where(eq(listings.id, id))
+        .run();
+      affected++;
+      continue;
+    }
+
+    const status: ListingStatus =
+      action === "publish"
+        ? "published"
+        : action === "pause"
+          ? "paused"
+          : action === "archive"
+            ? "archived"
+            : "draft";
+    db.update(listings)
+      .set({
+        status,
+        publishedAt: status === "published" && !current.publishedAt ? now : current.publishedAt,
+        updatedAt: now,
+      })
+      .where(eq(listings.id, id))
+      .run();
+    affected++;
+  }
+
+  revalidatePublic();
+  revalidatePath("/admin/oglasi");
+  return { affected };
+}
+
 export async function duplicateListing(id: number): Promise<void> {
   await requireAdmin();
   const current = db.select().from(listings).where(eq(listings.id, id)).get();

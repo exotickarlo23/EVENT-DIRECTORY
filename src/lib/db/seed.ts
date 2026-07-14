@@ -1,10 +1,15 @@
 /**
- * Seed logika — puni bazu demo podacima. Koristi je `scripts/seed.ts`
- * (npm run db:seed) te automatsko seedanje na serverless okruženju
- * (client.ts, kada je baza prazna).
+ * Seed logika — puni bazu. Koristi je `scripts/seed.ts` (npm run db:seed)
+ * te automatsko seedanje na serverless okruženju (client.ts, kada je baza
+ * prazna).
  *
- * Sva demo poslovanja su IZMIŠLJENA (isDemo = true). Prije produkcije
- * ukloniti demo oglase ili pokrenuti čistu bazu bez seeda oglasa.
+ * Oglasi su STVARNA poslovanja (isDemo = false) iz `real-listings.ts`
+ * (generirano iz scrapanog CSV-a). Taksonomija (kategorije, prigode,
+ * lokacije) i blog/cjenik ostaju definirani ovdje.
+ *
+ * Fotografije se NE unose seedom — dodaju se kroz admin galeriju ili CSV
+ * import (stupci cover_image / gallery). Do tada se prikazuje brendirani
+ * placeholder.
  */
 import type { Db } from "./client";
 import {
@@ -14,19 +19,13 @@ import {
   listings,
   listingCategories,
   listingOccasions,
-  serviceAreas,
-  packages,
   blogCategories,
   blogPosts,
   pricingPlans,
-  providers,
 } from "./schema";
 import { slugify, nowIso } from "../utils";
 import { sql } from "drizzle-orm";
-
-function daysFromNow(days: number): string {
-  return new Date(Date.now() + days * 86_400_000).toISOString();
-}
+import { REAL_LISTINGS } from "./real-listings";
 
 // ---------------------------------------------------------------- kategorije
 interface CatSeed {
@@ -150,6 +149,7 @@ const OCCASIONS = [
   "Festival",
   "Maturalna večer",
   "Privatna zabava",
+  "Koncert",
 ];
 
 const LOCATIONS: { name: string; county: string }[] = [
@@ -165,6 +165,9 @@ const LOCATIONS: { name: string; county: string }[] = [
   { name: "Samobor", county: "Zagrebačka županija" },
   { name: "Dubrovnik", county: "Dubrovačko-neretvanska županija" },
   { name: "Slavonski Brod", county: "Brodsko-posavska županija" },
+  { name: "Bjelovar", county: "Bjelovarsko-bilogorska županija" },
+  { name: "Hvar", county: "Splitsko-dalmatinska županija" },
+  { name: "Biograd", county: "Zadarska županija" },
 ];
 
 export function seedDatabase(db: Db): void {
@@ -220,434 +223,83 @@ export function seedDatabase(db: Db): void {
     locIds.set(loc.name, ins.id);
   });
 
-  // ------------------------------------------------------------- oglasi
-  interface ListingSeed {
-    name: string;
-    category: string;
-    subcategories?: string[];
-    location: string;
-    serviceAreas?: string[];
-    occasions: string[];
-    short: string;
-    description: string;
-    priceModel: "from" | "range" | "fixed" | "on_request";
-    priceFrom?: number;
-    priceTo?: number;
-    tier?: "featured";
-    featuredWeight?: number;
-    featuredUntil?: string;
-    claimed?: boolean;
-    atClientLocation?: boolean;
-    packages?: { name: string; priceFrom: number; includes: string[] }[];
-    phone?: boolean;
-    whatsapp?: boolean;
-  }
+  // ------------------------------------------------------------- oglasi (stvarni podaci)
+  // Slug-indeksirane mape taksonomije za mapiranje iz CSV-a.
+  const catBySlug = new Map<string, number>();
+  for (const [name, id] of catIds) catBySlug.set(slugify(name), id);
+  const occBySlug = new Map<string, number>();
+  for (const [name, id] of occIds) occBySlug.set(slugify(name), id);
+  const locBySlug = new Map<string, number>();
+  for (const [name, id] of locIds) locBySlug.set(slugify(name), id);
 
-  const LISTINGS: ListingSeed[] = [
-    {
-      name: "Skočko napuhanci",
-      category: "Napuhanci i atrakcije",
-      subcategories: ["Dvorci na napuhavanje", "Tobogani"],
-      location: "Zagreb",
-      serviceAreas: ["Velika Gorica", "Samobor", "Karlovac"],
-      occasions: ["Dječji rođendan", "Privatna zabava", "Festival"],
-      short: "Najam dvoraca na napuhavanje i tobogana s dostavom i postavljanjem po Zagrebu i okolici.",
-      description:
-        "Skočko napuhanci nude najam certificiranih dvoraca na napuhavanje, tobogana i poligona za dječje rođendane, proslave i javne evente. U cijenu je uključena dostava, postavljanje i preuzimanje unutar Zagreba. Svi napuhanci se redovito čiste i dezinficiraju, a uz svaki najam dobivate upute za sigurno korištenje. Dostupni smo i za višednevne najmove za festivale i općinske manifestacije.",
-      priceModel: "from",
-      priceFrom: 120,
-      tier: "featured",
-      featuredWeight: 10,
-      featuredUntil: daysFromNow(60),
-      claimed: true,
-      atClientLocation: true,
-      phone: true,
-      whatsapp: true,
-      packages: [
-        { name: "Mali dvorac (do 3 h)", priceFrom: 120, includes: ["Dostava u Zagrebu", "Postavljanje", "Podloga"] },
-        { name: "Veliki dvorac s toboganom (cijeli dan)", priceFrom: 220, includes: ["Dostava u Zagrebu", "Postavljanje", "Dežurna osoba po dogovoru"] },
-      ],
-    },
-    {
-      name: "Balonijada dekoracije",
-      category: "Dekoracije i baloni",
-      location: "Zagreb",
-      serviceAreas: ["Samobor", "Velika Gorica"],
-      occasions: ["Dječji rođendan", "Rođendan za odrasle", "Krštenje", "Baby shower", "Otvorenje"],
-      short: "Balon lukovi, tematske pozadine i personalizirane dekoracije za sve prigode.",
-      description:
-        "Izrađujemo balon dekoracije po mjeri: lukove, girlande, brojke, tematske kutke za fotografiranje i personalizirane natpise. Radimo s kvalitetnim balonima dužeg trajanja, a dekoraciju postavljamo na lokaciji ili je pripremamo za preuzimanje. Za veće evente nudimo i kombinacije s cvjetnim aranžmanima i pozadinama.",
-      priceModel: "from",
-      priceFrom: 80,
-      tier: "featured",
-      featuredWeight: 8,
-      featuredUntil: daysFromNow(45),
-      claimed: true,
-      atClientLocation: true,
-      phone: true,
-      whatsapp: true,
-    },
-    {
-      name: "Čarobni Leo — mađioničar",
-      category: "Mađioničari i izvođači",
-      location: "Zagreb",
-      serviceAreas: ["Varaždin", "Karlovac", "Rijeka"],
-      occasions: ["Dječji rođendan", "Poslovni event", "Privatna zabava", "Vjenčanje"],
-      short: "Mađioničarski show za djecu i odrasle — od rođendana do korporativnih evenata.",
-      description:
-        "Interaktivni mađioničarski show prilagođen publici: dječji program s puno sudjelovanja, obiteljski show ili elegantna close-up magija za vjenčanja i poslovne evente. Nastupam po cijeloj sjeverozapadnoj Hrvatskoj, a termin je najbolje rezervirati nekoliko tjedana unaprijed.",
-      priceModel: "range",
-      priceFrom: 150,
-      priceTo: 350,
-      claimed: true,
-      atClientLocation: true,
-      phone: true,
-    },
-    {
-      name: "Zvjezdice animacije",
-      category: "Animatori i maskote",
-      subcategories: ["Dječji animatori", "Face painting"],
-      location: "Zagreb",
-      serviceAreas: ["Velika Gorica", "Samobor"],
-      occasions: ["Dječji rođendan", "Krštenje", "Pričest", "Privatna zabava"],
-      short: "Tim animatorica s programima igara, face paintinga i modeliranja balona.",
-      description:
-        "Zvjezdice animacije vode dječji program na rođendanima i obiteljskim proslavama: timske igre, ples, face painting, modeliranje balona i mini disco. Program prilagođavamo dobi djece i prostoru — od stana do dvorane. Dolazimo s vlastitim rekvizitima i glazbom.",
-      priceModel: "from",
-      priceFrom: 90,
-      tier: "featured",
-      featuredWeight: 7,
-      featuredUntil: daysFromNow(30),
-      claimed: true,
-      atClientLocation: true,
-      phone: true,
-      whatsapp: true,
-      packages: [
-        { name: "Osnovna animacija (2 h)", priceFrom: 90, includes: ["1 animatorica", "Igre i ples", "Modeliranje balona"] },
-        { name: "Veliki paket (3 h)", priceFrom: 150, includes: ["2 animatorice", "Face painting", "Mini disco", "Pokloni za djecu"] },
-      ],
-    },
-    {
-      name: "Flash Kabina photobooth",
-      category: "Photobooth i 360° video",
-      subcategories: ["Klasični photobooth", "360° video booth"],
-      location: "Split",
-      serviceAreas: ["Zadar", "Dubrovnik"],
-      occasions: ["Vjenčanje", "Rođendan za odrasle", "Poslovni event", "Maturalna večer"],
-      short: "Photobooth i 360° video booth s neograničenim ispisima i online galerijom.",
-      description:
-        "Flash Kabina donosi zabavu na tvoj event: klasični photobooth s rekvizitima i neograničenim ispisima ili atraktivni 360° video booth. Sve fotografije i snimke dostupne su u online galeriji nakon događaja. Pokrivamo Dalmaciju, a za termine izvan Splita dostava se dogovara posebno.",
-      priceModel: "range",
-      priceFrom: 250,
-      priceTo: 500,
-      tier: "featured",
-      featuredWeight: 9,
-      featuredUntil: daysFromNow(90),
-      claimed: true,
-      phone: true,
-      whatsapp: true,
-      packages: [
-        { name: "Photobooth (3 h)", priceFrom: 250, includes: ["Neograničeni ispisi", "Rekviziti", "Online galerija", "Osoblje"] },
-        { name: "360° booth (3 h)", priceFrom: 350, includes: ["360° video", "LED rasvjeta", "Online galerija", "Osoblje"] },
-      ],
-    },
-    {
-      name: "DJ Ritam Mora",
-      category: "Glazba, bendovi i DJ-evi",
-      subcategories: ["DJ"],
-      location: "Split",
-      serviceAreas: ["Zadar", "Dubrovnik"],
-      occasions: ["Vjenčanje", "Rođendan za odrasle", "Poslovni event", "Privatna zabava"],
-      short: "DJ za vjenčanja i proslave s vlastitim razglasom i rasvjetom.",
-      description:
-        "Profesionalni DJ s više od deset godina iskustva na vjenčanjima i privatnim proslavama po Dalmaciji. Glazbu biramo zajedno unaprijed, a čitanje publike i prilagodba atmosferi su dio posla. U cijenu ulazi razglas i osnovna rasvjeta plesnog podija.",
-      priceModel: "from",
-      priceFrom: 400,
-      claimed: true,
-      phone: true,
-    },
-    {
-      name: "Studio Trenutak fotografija",
-      category: "Fotografija i video",
-      location: "Rijeka",
-      serviceAreas: ["Pula", "Zagreb"],
-      occasions: ["Vjenčanje", "Krštenje", "Pričest", "Krizma", "Poslovni event"],
-      short: "Fotografiranje vjenčanja, krštenja i obiteljskih proslava — prirodan, reportažni stil.",
-      description:
-        "Studio Trenutak specijaliziran je za reportažnu fotografiju događaja: vjenčanja, krštenja, pričesti i obiteljske proslave. Fokus je na spontanim trenucima i emociji, bez ukočenih poza. Isporuka obrađenih fotografija u online galeriji unutar tri tjedna.",
-      priceModel: "from",
-      priceFrom: 300,
-      claimed: false,
-      phone: true,
-    },
-    {
-      name: "Slatka Bajka torte",
-      category: "Torte, kolači i slastice",
-      location: "Zagreb",
-      occasions: ["Dječji rođendan", "Rođendan za odrasle", "Vjenčanje", "Krštenje", "Pričest"],
-      short: "Torte po narudžbi i slatki stolovi — od dječjih tematskih do elegantnih svadbenih.",
-      description:
-        "Izrađujemo torte po narudžbi za sve prigode: dječje tematske torte, svadbene katove i slatke stolove s kolačićima, cake popsovima i mini desertima. Narudžbe primamo najkasnije tjedan dana unaprijed, a za svadbene torte preporučujemo degustaciju.",
-      priceModel: "from",
-      priceFrom: 45,
-      claimed: false,
-      phone: true,
-      whatsapp: true,
-    },
-    {
-      name: "Dvorana Panorama",
-      category: "Prostori za proslave",
-      location: "Zagreb",
-      occasions: ["Vjenčanje", "Rođendan za odrasle", "Poslovni event", "Krizma", "Maturalna večer"],
-      short: "Klimatizirana dvorana za 120 gostiju s terasom i parkingom.",
-      description:
-        "Dvorana Panorama prima do 120 gostiju, a uz glavnu salu na raspolaganju su terasa s pogledom na grad, garderoba i besplatan parking. Prostor se iznajmljuje s osnovnim inventarom (stolovi, stolice, stolnjaci), uz mogućnost preporuke provjerenih catering partnera. Obilazak prostora moguć je uz najavu.",
-      priceModel: "on_request",
-      claimed: false,
-      phone: true,
-    },
-    {
-      name: "Gusto Catering",
-      category: "Catering i hrana",
-      location: "Zagreb",
-      serviceAreas: ["Velika Gorica", "Samobor", "Karlovac"],
-      occasions: ["Vjenčanje", "Poslovni event", "Rođendan za odrasle", "Krštenje", "Otvorenje"],
-      short: "Catering za proslave od 20 do 300 gostiju — klasični meniji, finger food i live cooking.",
-      description:
-        "Gusto Catering priprema menije po mjeri: klasične tople menije, finger food, buffet stolove i live cooking stanice. U ponudi su i vegetarijanske, veganske i bezglutenske opcije. Uz hranu osiguravamo posuđe, osoblje i postavu, a za veće evente radimo degustaciju menija.",
-      priceModel: "from",
-      priceFrom: 18,
-      tier: "featured",
-      featuredWeight: 6,
-      featuredUntil: daysFromNow(75),
-      claimed: true,
-      atClientLocation: true,
-      phone: true,
-      whatsapp: true,
-      packages: [
-        { name: "Finger food (po osobi)", priceFrom: 18, includes: ["8 zalogaja po osobi", "Posuđe", "Postava"] },
-        { name: "Topli buffet (po osobi)", priceFrom: 28, includes: ["Juha ili predjelo", "2 glavna jela", "Prilozi i salate", "Osoblje"] },
-      ],
-    },
-    {
-      name: "Igraonica Oblačić",
-      category: "Rođendaonice i igraonice",
-      location: "Rijeka",
-      occasions: ["Dječji rođendan"],
-      short: "Rođendaonica s velikim poligonom, disco kuglom i prostorom za 30 djece.",
-      description:
-        "Igraonica Oblačić organizira dječje rođendane u potpunosti: dvosatni termin s animatoricom, veliki mekani poligon, trampolin i disco rasvjeta. Hranu i tortu možete donijeti svoju ili odabrati naš meni. Termini vikendom se brzo popune, preporučujemo rezervaciju mjesec dana unaprijed.",
-      priceModel: "range",
-      priceFrom: 140,
-      priceTo: 260,
-      claimed: false,
-      phone: true,
-    },
-    {
-      name: "Šator Party najam",
-      category: "Šatori, stolovi i stolice",
-      location: "Osijek",
-      serviceAreas: ["Slavonski Brod"],
-      occasions: ["Vjenčanje", "Privatna zabava", "Godišnjica", "Festival"],
-      short: "Najam šatora od 25 do 300 m², stolova, stolica i podnica za proslave na otvorenom.",
-      description:
-        "Iznajmljujemo šatore raznih dimenzija s montažom i demontažom, podnice, stolove, klupe i stolice. Pokrivamo Slavoniju, a za veće udaljenosti prijevoz se obračunava po kilometru. Uz šatore nudimo i rasvjetu te bočne stranice za slučaj lošeg vremena.",
-      priceModel: "from",
-      priceFrom: 200,
-      claimed: false,
-      atClientLocation: true,
-      phone: true,
-    },
-    {
-      name: "LumenTeh rasvjeta i razglas",
-      category: "Rasvjeta, razglas i pozornice",
-      location: "Zagreb",
-      serviceAreas: ["Varaždin", "Rijeka", "Karlovac"],
-      occasions: ["Vjenčanje", "Poslovni event", "Promocija proizvoda", "Festival", "Maturalna večer"],
-      short: "Profesionalno ozvučenje, dekorativna rasvjeta i pozornice s tehničarem.",
-      description:
-        "LumenTeh oprema evente svih veličina: razglas s tehničarem, dekorativna ambijentalna rasvjeta, LED zidovi i modularne pozornice. Radimo tehničku pripremu s organizatorom, dolazimo na uviđaj prostora i osiguravamo dežurstvo tijekom događaja.",
-      priceModel: "on_request",
-      claimed: true,
-      phone: true,
-    },
-    {
-      name: "Agencija Prvi Ples",
-      category: "Organizacija događaja",
-      location: "Split",
-      serviceAreas: ["Zadar", "Dubrovnik", "Zagreb"],
-      occasions: ["Vjenčanje", "Poslovni event", "Team building", "Promocija proizvoda", "Otvorenje"],
-      short: "Organizacija vjenčanja i poslovnih evenata od koncepta do izvedbe.",
-      description:
-        "Agencija Prvi Ples vodi događaje od prve ideje do zadnjeg gosta: koncept, budžet, koordinacija dobavljača, scenografija i vođenje samog dana. Specijalizirani smo za vjenčanja u Dalmaciji i korporativne evente, a radimo i destination vjenčanja za parove iz inozemstva.",
-      priceModel: "on_request",
-      tier: "featured",
-      featuredWeight: 5,
-      featuredUntil: daysFromNow(120),
-      claimed: true,
-      phone: true,
-      whatsapp: true,
-    },
-    {
-      name: "Cvjetni kutak Iris",
-      category: "Cvijeće i cvjetne dekoracije",
-      location: "Varaždin",
-      serviceAreas: ["Zagreb"],
-      occasions: ["Vjenčanje", "Krštenje", "Godišnjica", "Zaruke"],
-      short: "Svadbeni buketi, cvjetni aranžmani i dekoracija prostora svježim cvijećem.",
-      description:
-        "Cvjetni kutak Iris izrađuje svadbene bukete, korsaže, aranžmane za stolove i cvjetne lukove. Radimo sa svježim sezonskim cvijećem i dogovaramo termin konzultacija za svaku svadbu. Dekoraciju postavljamo na lokaciji.",
-      priceModel: "from",
-      priceFrom: 60,
-      claimed: false,
-      atClientLocation: true,
-      phone: true,
-    },
-    {
-      name: "Oldtimer Kabriolet najam",
-      category: "Prijevoz i posebna vozila",
-      location: "Zagreb",
-      serviceAreas: ["Samobor", "Velika Gorica", "Karlovac"],
-      occasions: ["Vjenčanje", "Zaruke", "Godišnjica", "Maturalna večer"],
-      short: "Najam oldtimera s vozačem za vjenčanja i posebne prilike.",
-      description:
-        "Elegantan oldtimer kabriolet s vozačem za dolazak na vjenčanje, zaruke ili fotografiranje. U cijenu su uključeni gorivo i dekoracija vozila po želji. Rezervacije primamo najkasnije dva tjedna unaprijed, a termin vrijedi do četiri sata najma.",
-      priceModel: "range",
-      priceFrom: 180,
-      priceTo: 320,
-      claimed: false,
-      phone: true,
-    },
-    {
-      name: "Poklon Atelier Mašna",
-      category: "Pokloni i personalizirani proizvodi",
-      location: "Rijeka",
-      occasions: ["Vjenčanje", "Krštenje", "Pričest", "Baby shower", "Poslovni event"],
-      short: "Personalizirane zahvalnice, pokloni za goste i brendirani poslovni pokloni.",
-      description:
-        "Izrađujemo personalizirane poklone za goste: zahvalnice, magnetiće, svijeće, mirisne sapune i brendirane poslovne poklone. Dizajn radimo prema temi događaja, a narudžbe šaljemo poštom po cijeloj Hrvatskoj. Za narudžbe iznad 50 komada odobravamo količinski popust.",
-      priceModel: "from",
-      priceFrom: 3,
-      claimed: false,
-      whatsapp: true,
-    },
-    {
-      name: "Zvuk Slavonije bend",
-      category: "Glazba, bendovi i DJ-evi",
-      subcategories: ["Bendovi", "Tamburaši"],
-      location: "Osijek",
-      serviceAreas: ["Slavonski Brod", "Zagreb"],
-      occasions: ["Vjenčanje", "Godišnjica", "Privatna zabava", "Festival"],
-      short: "Tamburaški sastav za svadbe i proslave — od starogradskih do modernih hitova.",
-      description:
-        "Petočlani tamburaški sastav s repertoarom od starogradskih pjesama do modernih hitova. Sviramo svadbe, godišnjice, rođendane i manifestacije po Slavoniji i šire. Vlastito ozvučenje za prostore do 200 gostiju uključeno je u cijenu.",
-      priceModel: "from",
-      priceFrom: 600,
-      claimed: false,
-      phone: true,
-    },
-    {
-      name: "Mega Oprema najam",
-      category: "Najam event-opreme",
-      location: "Zagreb",
-      serviceAreas: ["Velika Gorica", "Samobor", "Karlovac", "Varaždin"],
-      occasions: ["Vjenčanje", "Poslovni event", "Privatna zabava", "Otvorenje", "Promocija proizvoda"],
-      short: "Najam posuđa, čaša, stolnjaka, barskih stolova i rashladne opreme.",
-      description:
-        "Mega Oprema iznajmljuje sve što event treba: posuđe i pribor, čaše za sve vrste pića, stolnjake, barske stolove, grijalice za terase i rashladne vitrine. Dostava i preuzimanje na lokaciji, a prljavo posuđe preuzimamo bez pranja.",
-      priceModel: "on_request",
-      claimed: true,
-      atClientLocation: true,
-      phone: true,
-      whatsapp: true,
-    },
-    {
-      name: "Maskota Show Zeko i Lola",
-      category: "Animatori i maskote",
-      subcategories: ["Maskote"],
-      location: "Zadar",
-      serviceAreas: ["Split"],
-      occasions: ["Dječji rođendan", "Otvorenje", "Festival"],
-      short: "Dolazak maskota s plesnim programom i fotografiranjem za dječje proslave.",
-      description:
-        "Maskote Zeko i Lola dolaze na dječje rođendane, otvorenja i manifestacije s kratkim plesnim programom, igrama i fotografiranjem. Nastup traje 45–60 minuta, a maskote biraju roditelji prema želji slavljenika iz naše ponude kostima.",
-      priceModel: "fixed",
-      priceFrom: 110,
-      claimed: false,
-      atClientLocation: true,
-      whatsapp: true,
-    },
-    {
-      name: "Vodeni Svijet napuhanci",
-      category: "Napuhanci i atrakcije",
-      subcategories: ["Vodeni napuhanci", "Sportske atrakcije"],
-      location: "Split",
-      serviceAreas: ["Zadar"],
-      occasions: ["Dječji rođendan", "Festival", "Team building"],
-      short: "Vodeni napuhanci i sportske atrakcije za ljetne proslave i evente uz more.",
-      description:
-        "Vodeni tobogani, aqua poligoni i sportske napuhane atrakcije za ljetne evente, plaže i team buildinge. Uz svaku atrakciju osiguravamo dežurnu osobu i osiguranje od odgovornosti. Sezona traje od svibnja do rujna, termini se brzo popune.",
-      priceModel: "from",
-      priceFrom: 250,
-      claimed: false,
-      phone: true,
-    },
-    {
-      name: "Foto Iskra events",
-      category: "Fotografija i video",
-      location: "Osijek",
-      serviceAreas: ["Slavonski Brod", "Zagreb"],
-      occasions: ["Vjenčanje", "Krizma", "Poslovni event", "Maturalna večer"],
-      short: "Foto i video praćenje događaja s dronom — vjenčanja, krizme i poslovni eventi.",
-      description:
-        "Dvočlani tim za foto i video praćenje događaja: fotograf i snimatelj s dronom. Isporučujemo obrađene fotografije i highlight video do pet minuta. Za vjenčanja nudimo i predsvadbeno fotografiranje u prirodi.",
-      priceModel: "range",
-      priceFrom: 450,
-      priceTo: 900,
-      claimed: false,
-      phone: true,
-    },
-  ];
+  // CSV vokabular prigoda → postojeće prigode (bez stvaranja duplikata).
+  const OCCASION_REMAP: Record<string, string> = {
+    "korporativni-event": "poslovni-event",
+    krstitke: "krstenje",
+    party: "privatna-zabava",
+    "djeciji-rodendan": "djecji-rodendan",
+    obljetnica: "godisnjica",
+    maturalna: "maturalna-vecer",
+    rodendan: "rodendan-za-odrasle",
+    "prva-pricest": "pricest",
+  };
 
-  const providerIns = db
-    .insert(providers)
-    .values({ name: "Demo ponuđači (seed)", note: "Zajednički demo provider za seed oglase", createdAt: now })
-    .returning({ id: providers.id })
-    .get();
+  const usedSlugs = new Set<string>();
+  let seededListings = 0;
+  REAL_LISTINGS.forEach((item, i) => {
+    const catId = catBySlug.get(item.categorySlug);
+    const locId = locBySlug.get(item.locationSlug);
+    if (!catId || !locId) {
+      console.warn(
+        `[seed] preskačem "${item.name}" — nepoznata kategorija/lokacija (${item.categorySlug} / ${item.locationSlug})`
+      );
+      return;
+    }
+    let slug = slugify(item.name);
+    let n = 2;
+    while (usedSlugs.has(slug)) slug = `${slugify(item.name)}-${n++}`;
+    usedSlugs.add(slug);
 
-  LISTINGS.forEach((item, i) => {
-    const catId = catIds.get(item.category);
-    const locId = locIds.get(item.location);
-    if (!catId || !locId) throw new Error(`Nepoznata kategorija/lokacija za ${item.name}`);
-    const publishedAt = new Date(Date.now() - (i + 3) * 86_400_000).toISOString();
+    const priceFrom = item.priceFrom ?? null;
+    const priceModel =
+      item.priceModel === "from" ||
+      item.priceModel === "range" ||
+      item.priceModel === "fixed" ||
+      item.priceModel === "on_request"
+        ? item.priceModel
+        : priceFrom != null
+          ? "from"
+          : "on_request";
+    // Deterministički razmaknuti publishedAt za stabilan poredak.
+    const publishedAt = new Date(Date.now() - (i + 1) * 3_600_000).toISOString();
+
     const listing = db
       .insert(listings)
       .values({
-        slug: slugify(item.name),
+        slug,
         name: item.name,
-        businessName: `${item.name} d.o.o. (demo)`,
+        businessName: item.businessName || item.name,
         status: "published",
-        tier: item.tier ?? "free",
-        claimStatus: item.claimed ? "claimed" : "unclaimed",
-        providerId: providerIns.id,
-        shortDescription: item.short,
+        tier: "free",
+        claimStatus: "unclaimed",
+        shortDescription: item.short.slice(0, 300),
         description: item.description,
         primaryCategoryId: catId,
         baseLocationId: locId,
-        priceFrom: item.priceFrom ?? null,
+        address: item.address || null,
+        priceFrom,
         priceTo: item.priceTo ?? null,
-        priceModel: item.priceModel,
-        phone: item.phone ? "+385 91 000 0000" : null,
-        whatsapp: item.whatsapp ? "+385 91 000 0000" : null,
-        email: `demo-${slugify(item.name)}@example.com`,
-        website: null,
-        instagram: null,
-        servesAtClientLocation: item.atClientLocation ?? false,
-        featuredWeight: item.featuredWeight ?? 0,
-        featuredUntil: item.featuredUntil ?? null,
+        priceModel,
+        phone: item.phone || null,
+        whatsapp: item.whatsapp || null,
+        email: item.email || null,
+        website: item.website || null,
+        instagram: item.instagram || null,
+        facebook: item.facebook || null,
+        servesAtClientLocation: true,
         publishedAt,
-        dataSource: "Seed demo podaci",
-        isDemo: true,
+        dataSource: item.dataSource || "web",
+        isDemo: false,
         createdAt: now,
         updatedAt: now,
       })
@@ -655,46 +307,17 @@ export function seedDatabase(db: Db): void {
       .get();
 
     db.insert(listingCategories).values({ listingId: listing.id, categoryId: catId }).run();
-    for (const sub of item.subcategories ?? []) {
-      const subId = catIds.get(sub);
-      if (subId) db.insert(listingCategories).values({ listingId: listing.id, categoryId: subId }).run();
-    }
-    for (const occ of item.occasions) {
-      const occId = occIds.get(occ);
+    const seenOcc = new Set<string>();
+    for (const rawOcc of item.occasions) {
+      const occSlug = OCCASION_REMAP[rawOcc] ?? rawOcc;
+      if (seenOcc.has(occSlug)) continue;
+      seenOcc.add(occSlug);
+      const occId = occBySlug.get(occSlug);
       if (occId) db.insert(listingOccasions).values({ listingId: listing.id, occasionId: occId }).run();
     }
-    for (const area of item.serviceAreas ?? []) {
-      const areaId = locIds.get(area);
-      if (areaId) db.insert(serviceAreas).values({ listingId: listing.id, locationId: areaId }).run();
-    }
-    (item.packages ?? []).forEach((pkg, j) => {
-      db.insert(packages)
-        .values({
-          listingId: listing.id,
-          name: pkg.name,
-          priceFrom: pkg.priceFrom,
-          includes: JSON.stringify(pkg.includes),
-          sortOrder: j,
-        })
-        .run();
-    });
+    seededListings++;
   });
-
-  // Jedan draft primjer za admin pregled
-  db.insert(listings)
-    .values({
-      slug: "primjer-draft-oglasa",
-      name: "Primjer draft oglasa",
-      status: "draft",
-      shortDescription: "Ovaj oglas je u statusu draft i nije vidljiv javno.",
-      primaryCategoryId: catIds.get("Catering i hrana"),
-      baseLocationId: locIds.get("Zagreb"),
-      isDemo: true,
-      dataSource: "Seed demo podaci",
-      createdAt: now,
-      updatedAt: now,
-    })
-    .run();
+  console.log(`[seed] uneseno stvarnih oglasa: ${seededListings}`);
 
   // ------------------------------------------------------------- blog
   const BLOG_CATS = [
