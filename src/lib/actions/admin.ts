@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, inArray } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import {
   listings,
@@ -14,7 +14,10 @@ import {
   businessSubmissions,
   categories,
   locations,
+  LISTING_STATUSES,
+  LISTING_TIERS,
   type ListingStatus,
+  type ListingTier,
 } from "@/lib/db/schema";
 import {
   checkCredentials,
@@ -267,6 +270,111 @@ export async function deleteListing(id: number): Promise<void> {
   db.delete(listings).where(eq(listings.id, id)).run();
   revalidatePublic();
   revalidatePath("/admin/oglasi");
+}
+
+// ---------- Bulk (skupne) akcije nad oglasima ----------
+
+function sanitizeIds(ids: number[]): number[] {
+  return Array.from(
+    new Set(ids.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0))
+  );
+}
+
+export interface BulkResult extends ActionResult {
+  affected?: number;
+}
+
+/** Skupna promjena statusa za više oglasa odjednom. */
+export async function bulkSetListingStatus(ids: number[], status: ListingStatus): Promise<BulkResult> {
+  await requireAdmin();
+  if (!LISTING_STATUSES.includes(status)) return { ok: false, error: "Nepoznat status." };
+  const clean = sanitizeIds(ids);
+  if (clean.length === 0) return { ok: false, error: "Nije odabran nijedan oglas." };
+  const now = nowIso();
+  db.update(listings)
+    .set({
+      status,
+      publishedAt:
+        status === "published"
+          ? sql`COALESCE(${listings.publishedAt}, ${now})`
+          : sql`${listings.publishedAt}`,
+      updatedAt: now,
+    })
+    .where(inArray(listings.id, clean))
+    .run();
+  revalidatePublic();
+  revalidatePath("/admin/oglasi");
+  return { ok: true, affected: clean.length };
+}
+
+/** Skupna promjena tiera (free / featured). */
+export async function bulkSetListingTier(ids: number[], tier: ListingTier): Promise<BulkResult> {
+  await requireAdmin();
+  if (!LISTING_TIERS.includes(tier)) return { ok: false, error: "Nepoznat tier." };
+  const clean = sanitizeIds(ids);
+  if (clean.length === 0) return { ok: false, error: "Nije odabran nijedan oglas." };
+  db.update(listings)
+    .set({ tier, updatedAt: nowIso() })
+    .where(inArray(listings.id, clean))
+    .run();
+  revalidatePublic();
+  revalidatePath("/admin/oglasi");
+  return { ok: true, affected: clean.length };
+}
+
+/** Skupna promjena primarne kategorije. Ažurira i junction tablicu. */
+export async function bulkSetPrimaryCategory(ids: number[], categoryId: number): Promise<BulkResult> {
+  await requireAdmin();
+  const clean = sanitizeIds(ids);
+  if (clean.length === 0) return { ok: false, error: "Nije odabran nijedan oglas." };
+  const cat = db.select().from(categories).where(eq(categories.id, categoryId)).get();
+  if (!cat) return { ok: false, error: "Nepoznata kategorija." };
+  db.update(listings)
+    .set({ primaryCategoryId: categoryId, updatedAt: nowIso() })
+    .where(inArray(listings.id, clean))
+    .run();
+  // Osiguraj da je nova primarna kategorija i u junction tablici.
+  for (const id of clean) {
+    const exists = db
+      .select()
+      .from(listingCategories)
+      .where(sql`${listingCategories.listingId} = ${id} AND ${listingCategories.categoryId} = ${categoryId}`)
+      .get();
+    if (!exists) db.insert(listingCategories).values({ listingId: id, categoryId }).run();
+  }
+  revalidatePublic();
+  revalidatePath("/admin/oglasi");
+  return { ok: true, affected: clean.length };
+}
+
+/** Skupna promjena bazne lokacije. */
+export async function bulkSetBaseLocation(ids: number[], locationId: number): Promise<BulkResult> {
+  await requireAdmin();
+  const clean = sanitizeIds(ids);
+  if (clean.length === 0) return { ok: false, error: "Nije odabran nijedan oglas." };
+  const loc = db.select().from(locations).where(eq(locations.id, locationId)).get();
+  if (!loc) return { ok: false, error: "Nepoznata lokacija." };
+  db.update(listings)
+    .set({ baseLocationId: locationId, updatedAt: nowIso() })
+    .where(inArray(listings.id, clean))
+    .run();
+  revalidatePublic();
+  revalidatePath("/admin/oglasi");
+  return { ok: true, affected: clean.length };
+}
+
+/** Skupno brisanje oglasa (uključujući junction zapise). */
+export async function bulkDeleteListings(ids: number[]): Promise<BulkResult> {
+  await requireAdmin();
+  const clean = sanitizeIds(ids);
+  if (clean.length === 0) return { ok: false, error: "Nije odabran nijedan oglas." };
+  db.delete(listingCategories).where(inArray(listingCategories.listingId, clean)).run();
+  db.delete(listingOccasions).where(inArray(listingOccasions.listingId, clean)).run();
+  db.delete(serviceAreas).where(inArray(serviceAreas.listingId, clean)).run();
+  db.delete(listings).where(inArray(listings.id, clean)).run();
+  revalidatePublic();
+  revalidatePath("/admin/oglasi");
+  return { ok: true, affected: clean.length };
 }
 
 // ---------- Upiti / zahtjevi ----------
