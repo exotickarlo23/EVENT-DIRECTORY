@@ -49,6 +49,20 @@ export function getDashboardStats(): DashboardStats {
   };
 }
 
+/** Broj aktivnosti koje zahtijevaju pažnju/pregled — po admin sekciji (ključ = href). */
+export function getAdminNavBadges(): Record<string, number> {
+  const one = (q: ReturnType<typeof sql>) => db.get<{ c: number }>(q)?.c ?? 0;
+  return {
+    "/admin/upiti": one(sql`SELECT COUNT(*) c FROM leads WHERE status = 'new'`),
+    "/admin/zahtjevi-za-preuzimanje": one(
+      sql`SELECT COUNT(*) c FROM claim_requests WHERE status IN ('pending','under_review')`
+    ),
+    "/admin/prijave-poslovanja": one(
+      sql`SELECT COUNT(*) c FROM business_submissions WHERE status IN ('pending','under_review')`
+    ),
+  };
+}
+
 export interface AdminListingRow extends Listing {
   categoryName: string | null;
   locationName: string | null;
